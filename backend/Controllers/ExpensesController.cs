@@ -1,7 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+
 using backend.Data;
 using backend.Models;
+using backend.DTOs;
+
 
 namespace backend.Controllers;
 
@@ -35,19 +38,22 @@ public class ExpensesController : ControllerBase
         return expense;
     }
 
-
     [HttpPost]
-    public async Task<ActionResult<Expense>> CreateExpense(Expense expense)
+    public async Task<ActionResult<Expense>> CreateExpense(CreateExpenseDto request)
     {
-        _context.Expenses.Add(expense);
+        var expense = new Expense
+        {
+            Title = request.Title,
+            Amount = request.Amount,
+            Category = request.Category,
+            Date = request.Date,
+            UserId = request.UserId
+        };
 
+        _context.Expenses.Add(expense);
         await _context.SaveChangesAsync();
 
-        return CreatedAtAction(
-            nameof(GetExpense),
-            new { id = expense.Id },
-            expense
-        );
+        return CreatedAtAction(nameof(GetExpense), new { id = expense.Id }, expense);
     }
 
 
