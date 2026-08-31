@@ -88,6 +88,23 @@ describe('deleteTask', () => {
 })
 
 describe('request', () => {
+  it('keeps the JSON content type when callers add a custom header', async () => {
+    const fetch = vi.fn().mockResolvedValue(jsonResponse([]))
+    vi.stubGlobal('fetch', fetch)
+
+    await request('/api/tasks', { headers: { 'X-Request-Id': 'request-123' } })
+
+    expect(fetch).toHaveBeenCalledWith(
+      'http://localhost:5000/api/tasks',
+      expect.objectContaining({
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Request-Id': 'request-123',
+        },
+      }),
+    )
+  })
+
   it('preserves validation messages in ApiError details', async () => {
     const problem = {
       title: 'One or more validation errors occurred.',

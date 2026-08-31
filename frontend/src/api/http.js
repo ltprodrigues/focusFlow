@@ -11,8 +11,8 @@ export async function request(path, options = {}) {
   const response = await fetch(
     `${import.meta.env.VITE_API_URL ?? 'http://localhost:5000'}${path}`,
     {
-      headers: { 'Content-Type': 'application/json', ...options.headers },
       ...options,
+      headers: { 'Content-Type': 'application/json', ...options.headers },
     },
   )
   const body = response.status === 204 ? null : await response.json()
