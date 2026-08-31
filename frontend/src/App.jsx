@@ -1,121 +1,77 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { listTasks } from './api/tasks'
+import { WeeklyPlanner } from './components/assignments/WeeklyPlanner'
+import { DashboardHeader } from './components/layout/DashboardHeader'
+import { Sidebar } from './components/layout/Sidebar'
 import './App.css'
+import { getWeekRange } from './utils/week'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [weekDate, setWeekDate] = useState(() => new Date())
+  const [tasks, setTasks] = useState([])
+  const [status, setStatus] = useState('loading')
+  const [error, setError] = useState('')
+  const week = useMemo(() => getWeekRange(weekDate), [weekDate])
+
+  const taskRequest = useCallback((signal) => {
+    const rangeEnd = new Date(week.end)
+    rangeEnd.setDate(rangeEnd.getDate() + 2)
+    rangeEnd.setHours(23, 59, 59, 999)
+    return listTasks({ from: week.start.toISOString(), to: rangeEnd.toISOString(), signal })
+  }, [week.end, week.start])
+
+  const settleTaskRequest = useCallback((request) => {
+    request
+      .then((items) => {
+        setTasks(items)
+        setStatus('ready')
+      })
+      .catch((requestError) => {
+        if (requestError.name !== 'AbortError') {
+          setError('Assignments could not load.')
+          setStatus('error')
+        }
+      })
+  }, [])
+
+  function loadTasks() {
+    setStatus('loading')
+    setError('')
+    settleTaskRequest(taskRequest())
+  }
+
+  useEffect(() => {
+    const controller = new AbortController()
+    settleTaskRequest(taskRequest(controller.signal))
+    return () => controller.abort()
+  }, [settleTaskRequest, taskRequest])
+
+  function shiftWeek(amount) {
+    setWeekDate((current) => {
+      const next = new Date(current)
+      next.setDate(next.getDate() + amount * 7)
+      return next
+    })
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+    <div className="dashboard-shell" id="dashboard">
+      <div className="dashboard-layout">
+        <Sidebar />
+        <main className="dashboard-main">
+          <DashboardHeader />
+          <WeeklyPlanner
+            days={week.days}
+            error={status === 'error' ? error : undefined}
+            isLoading={status === 'loading'}
+            onNextWeek={() => shiftWeek(1)}
+            onPreviousWeek={() => shiftWeek(-1)}
+            onRetry={loadTasks}
+            tasks={tasks}
+          />
+        </main>
+      </div>
+    </div>
   )
 }
 

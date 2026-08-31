@@ -1,0 +1,24 @@
+.planner-card { background: var(--surface); border: 1px solid var(--line); border-radius: 15px; box-shadow: 0 7px 18px rgba(35, 58, 49, .035); padding: 17px; }
+.planner-title-row { align-items: end; display: flex; justify-content: space-between; margin-bottom: 14px; }
+.planner-title-row h2 { font-size: 1rem; margin: 0; }
+.week-controls { align-items: center; background: #fbfcfa; border: 1px solid #dfe5e1; border-radius: 8px; display: flex; font-size: .7rem; gap: 6px; padding: 3px 6px; }
+.week-controls button { background: transparent; border: 0; border-radius: 5px; color: var(--forest); cursor: pointer; font: inherit; font-size: 1.25rem; line-height: 1; padding: 2px 4px; }
+.week-grid { display: grid; gap: 8px; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.day-column { background: #f8faf7; border: 1px solid #edf0ec; border-radius: 10px; min-height: 210px; padding: 10px; }
+.day-column.is-today { background: #f2f7f4; border-color: #c9d8d1; }
+.day-name { color: #89948f; font-size: .65rem; font-weight: 700; letter-spacing: .06em; margin: 0; }
+.day-column h3 { font-size: 1.35rem; line-height: 1; margin: 3px 0 0; }
+.assignment-card { background: #edf2ee; border: 0; border-left: 3px solid var(--priority-low); border-radius: 7px; color: var(--ink); cursor: pointer; display: grid; font: inherit; font-size: .7rem; gap: 2px; line-height: 1.45; margin-top: 15px; padding: 8px 7px; text-align: left; width: 100%; }
+.assignment-card h4 { font-size: .75rem; margin: 0; }
+.priority-high { background: #fde3d3; border-left-color: var(--priority-high); }
+.priority-medium { background: #e1ecff; border-left-color: var(--priority-medium); }
+.priority-low { background: #dff0dc; border-left-color: var(--priority-low); }
+.empty-state, .planner-loading { color: #a4ada8; font-size: .7rem; margin: 62px 0 0; text-align: center; }
+.next-deadline { align-items: center; background: #fff8ee; border-radius: 8px; color: #6e5536; display: flex; font-size: .72rem; justify-content: space-between; margin-top: 9px; padding: 8px 10px; }
+.next-deadline button { background: transparent; border: 0; color: inherit; cursor: pointer; font: inherit; font-weight: 700; padding: 0; }
+@media (max-width: 800px) {
+  .planner-scroll { overflow-x: auto; padding-bottom: 4px; }
+  .week-grid { grid-template-columns: repeat(5, 150px); min-width: 782px; }
+  .planner-title-row { align-items: flex-start; gap: 10px; }
+  .next-deadline { align-items: flex-start; gap: 8px; }
+}
