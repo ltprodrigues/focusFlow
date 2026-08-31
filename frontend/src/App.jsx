@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { listTasks } from './api/tasks'
 import { WeeklyPlanner } from './components/assignments/WeeklyPlanner'
 import { DashboardHeader } from './components/layout/DashboardHeader'
@@ -12,41 +12,60 @@ function App() {
   const [status, setStatus] = useState('loading')
   const [error, setError] = useState('')
   const week = useMemo(() => getWeekRange(weekDate), [weekDate])
+  const requestRef = useRef({ controller: null, id: 0 })
 
-  const taskRequest = useCallback((signal) => {
-    const rangeEnd = new Date(week.end)
+  const taskRequest = useCallback((range, signal) => {
+    const rangeEnd = new Date(range.end)
     rangeEnd.setDate(rangeEnd.getDate() + 2)
     rangeEnd.setHours(23, 59, 59, 999)
-    return listTasks({ from: week.start.toISOString(), to: rangeEnd.toISOString(), signal })
-  }, [week.end, week.start])
+    return listTasks({ from: range.start.toISOString(), to: rangeEnd.toISOString(), signal })
+  }, [])
 
-  const settleTaskRequest = useCallback((request) => {
-    request
+  const abortTaskRequest = useCallback(() => {
+    requestRef.current.controller?.abort()
+    requestRef.current = { controller: null, id: requestRef.current.id + 1 }
+  }, [])
+
+  const startTaskRequest = useCallback((range) => {
+    requestRef.current.controller?.abort()
+    const controller = new AbortController()
+    const id = requestRef.current.id + 1
+    requestRef.current = { controller, id }
+
+    taskRequest(range, controller.signal)
       .then((items) => {
+        if (requestRef.current.id !== id) {
+          return
+        }
         setTasks(items)
         setStatus('ready')
       })
       .catch((requestError) => {
-        if (requestError.name !== 'AbortError') {
+        if (requestRef.current.id === id && requestError.name !== 'AbortError') {
           setError('Assignments could not load.')
           setStatus('error')
         }
       })
-  }, [])
+  }, [taskRequest])
 
   function loadTasks() {
+    abortTaskRequest()
+    setTasks([])
     setStatus('loading')
     setError('')
-    settleTaskRequest(taskRequest())
+    startTaskRequest(week)
   }
 
   useEffect(() => {
-    const controller = new AbortController()
-    settleTaskRequest(taskRequest(controller.signal))
-    return () => controller.abort()
-  }, [settleTaskRequest, taskRequest])
+    startTaskRequest(week)
+    return abortTaskRequest
+  }, [abortTaskRequest, startTaskRequest, week])
 
   function shiftWeek(amount) {
+    abortTaskRequest()
+    setTasks([])
+    setStatus('loading')
+    setError('')
     setWeekDate((current) => {
       const next = new Date(current)
       next.setDate(next.getDate() + amount * 7)

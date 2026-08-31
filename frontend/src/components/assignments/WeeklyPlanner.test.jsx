@@ -2,6 +2,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { WeeklyPlanner } from './WeeklyPlanner'
+import { AssignmentCard } from './AssignmentCard'
 
 const weekDays = [
   new Date(2026, 7, 24),
@@ -23,10 +24,17 @@ const essay = {
 afterEach(cleanup)
 
 describe('WeeklyPlanner', () => {
+  it('uses phrasing content rather than a heading for assignment titles', () => {
+    render(<AssignmentCard task={essay} />)
+
+    expect(screen.getByText('Research essay').tagName).toBe('STRONG')
+    expect(screen.queryByRole('heading', { name: 'Research essay' })).not.toBeInTheDocument()
+  })
+
   it('places assignments in their weekday and shows empty days', () => {
     render(<WeeklyPlanner days={weekDays} tasks={[essay]} />)
 
-    expect(screen.getByRole('heading', { name: 'Research essay' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Research essay/ })).toBeInTheDocument()
     expect(screen.getAllByText('No assignments')).toHaveLength(4)
   })
 
@@ -78,7 +86,7 @@ describe('WeeklyPlanner', () => {
     expect(screen.getByText((_, element) => (
       element?.classList.contains('next-deadline') && element.textContent.includes('Due next: Weekend reading')
     ))).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Weekend reading' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Weekend reading/ })).not.toBeInTheDocument()
   })
 
   it('shows a retryable section error', async () => {

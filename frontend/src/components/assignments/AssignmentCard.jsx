@@ -7,7 +7,7 @@ export function AssignmentCard({ task, onSelect }) {
 
   return (
     <button className={`assignment-card priority-${priority}`} type="button" onClick={() => onSelect?.(task)}>
-      <h4>{task.title}</h4>
+      <strong>{task.title}</strong>
       <span>{task.course} · {formatTime(task.dueDate)}</span>
     </button>
   )
