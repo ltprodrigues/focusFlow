@@ -22,7 +22,7 @@ function getNextTask(tasks, now) {
 }
 
 export function WeeklyPlanner({
-  days = [], tasks = [], isLoading = false, error, now = new Date(), onPreviousWeek, onNextWeek, onSelectTask, onRetry,
+  days = [], tasks = [], isLoading = false, error, now = new Date(), onPreviousWeek, onNextWeek, onSelectTask, onRetry, onViewAll,
 }) {
   const nextTask = getNextTask(tasks, now)
 
@@ -60,7 +60,7 @@ export function WeeklyPlanner({
       )}
       <div className="next-deadline" aria-live="polite">
         {nextTask ? <span><strong>Due next:</strong> {nextTask.title} {dueFormat.format(new Date(nextTask.dueDate))}</span> : <span><strong>Due next:</strong> No upcoming assignments</span>}
-        <button type="button">View all assignments →</button>
+        <button type="button" onClick={onViewAll}>View all assignments →</button>
       </div>
     </section>
   )

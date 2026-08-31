@@ -1,11 +1,16 @@
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import { listTasks } from './api/tasks'
+import { createTask, deleteTask, listTasks, updateTask } from './api/tasks'
 import { getWeekRange } from './utils/week'
 
-vi.mock('./api/tasks', () => ({ listTasks: vi.fn() }))
+vi.mock('./api/tasks', () => ({
+  createTask: vi.fn(),
+  deleteTask: vi.fn(),
+  listTasks: vi.fn(),
+  updateTask: vi.fn(),
+}))
 
 function deferred() {
   let resolve
@@ -78,5 +83,123 @@ describe('App', () => {
 
     expect(screen.getAllByText('Loading assignments…')).toHaveLength(5)
     expect(screen.queryByRole('button', { name: /Current week task/ })).not.toBeInTheDocument()
+  })
+
+  it('creates an assignment from the header and refreshes the active section', async () => {
+    const user = userEvent.setup()
+    listTasks.mockResolvedValueOnce([]).mockResolvedValueOnce([])
+    createTask.mockResolvedValue({ id: 8 })
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /Add assignment/ }))
+    expect(screen.getByRole('dialog', { name: 'New assignment' })).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Title'), 'Research essay')
+    await user.type(screen.getByLabelText('Course'), 'English')
+    await user.type(screen.getByLabelText('Due date and time'), '2026-09-02T14:30')
+    await user.selectOptions(screen.getByLabelText('Priority'), 'High')
+    await user.type(screen.getByLabelText('Notes'), 'Read chapters 4 and 5')
+    await user.click(screen.getByRole('button', { name: 'Save assignment' }))
+
+    await waitFor(() => expect(createTask).toHaveBeenCalledWith({
+      title: 'Research essay',
+      course: 'English',
+      dueDate: expect.stringMatching(/^2026-09-02T\d\d:30:00\.000Z$/),
+      priority: 'High',
+      isCompleted: false,
+      notes: 'Read chapters 4 and 5',
+    }))
+    expect(listTasks).toHaveBeenCalledTimes(2)
+    expect(screen.queryByRole('dialog', { name: 'New assignment' })).not.toBeInTheDocument()
+  })
+
+  it('opens a selected card in edit mode and persists completion', async () => {
+    const user = userEvent.setup()
+    const task = currentWeekTask('Research essay')
+    listTasks.mockResolvedValueOnce([task]).mockResolvedValueOnce([{ ...task, isCompleted: true }])
+    updateTask.mockResolvedValue(null)
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: /Research essay/ }))
+    expect(screen.getByRole('dialog', { name: 'Edit assignment' })).toBeInTheDocument()
+    await user.click(screen.getByRole('checkbox', { name: 'Completed' }))
+    await user.click(screen.getByRole('button', { name: 'Save assignment' }))
+
+    await waitFor(() => expect(updateTask).toHaveBeenCalledWith(task.id, expect.objectContaining({
+      title: 'Research essay',
+      isCompleted: true,
+    })))
+    expect(screen.queryByRole('dialog', { name: 'Edit assignment' })).not.toBeInTheDocument()
+  })
+
+  it('requires confirmation before deleting an assignment', async () => {
+    const user = userEvent.setup()
+    const task = currentWeekTask('Research essay')
+    listTasks.mockResolvedValueOnce([task]).mockResolvedValueOnce([])
+    deleteTask.mockResolvedValue(null)
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: /Research essay/ }))
+    await user.click(screen.getByRole('button', { name: 'Delete assignment' }))
+    expect(deleteTask).not.toHaveBeenCalled()
+
+    const confirmation = screen.getByRole('dialog', { name: 'Delete assignment?' })
+    await user.click(within(confirmation).getByRole('button', { name: 'Delete assignment' }))
+
+    await waitFor(() => expect(deleteTask).toHaveBeenCalledWith(task.id))
+    expect(screen.queryByRole('dialog', { name: 'Delete assignment?' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Edit assignment' })).not.toBeInTheDocument()
+  })
+
+  it('cancels editing without mutating the assignment', async () => {
+    const user = userEvent.setup()
+    const task = currentWeekTask('Research essay')
+    listTasks.mockResolvedValue([task])
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: /Research essay/ }))
+    await user.clear(screen.getByLabelText('Title'))
+    await user.type(screen.getByLabelText('Title'), 'Changed locally')
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(updateTask).not.toHaveBeenCalled()
+    expect(deleteTask).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog', { name: 'Edit assignment' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the create dialog open when the API rejects the mutation', async () => {
+    const user = userEvent.setup()
+    listTasks.mockResolvedValue([])
+    createTask.mockRejectedValue(new Error('offline'))
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /Add assignment/ }))
+    await user.type(screen.getByLabelText('Title'), 'Research essay')
+    await user.type(screen.getByLabelText('Course'), 'English')
+    await user.type(screen.getByLabelText('Due date and time'), '2026-09-02T14:30')
+    await user.click(screen.getByRole('button', { name: 'Save assignment' }))
+
+    expect(await screen.findByText('Could not save the assignment. Try again.')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'New assignment' })).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Research essay')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['weekday', currentWeekTask('Weekday essay')],
+    ['weekend', currentWeekTask('Weekend reading', 6)],
+  ])('loads all assignments without a range and opens a %s record in edit mode', async (_, selectedTask) => {
+    const user = userEvent.setup()
+    const weekday = currentWeekTask('Weekday essay')
+    const weekend = currentWeekTask('Weekend reading', 6)
+    listTasks.mockResolvedValueOnce([]).mockResolvedValueOnce([weekend, weekday])
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /View all assignments/ }))
+    expect(listTasks).toHaveBeenNthCalledWith(2)
+    const allDialog = await screen.findByRole('dialog', { name: 'All assignments' })
+    await user.click(within(allDialog).getByRole('button', { name: new RegExp(selectedTask.title) }))
+
+    expect(screen.queryByRole('dialog', { name: 'All assignments' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Edit assignment' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Title')).toHaveValue(selectedTask.title)
   })
 })
