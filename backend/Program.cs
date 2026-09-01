@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using backend.Data;
+using backend.Serialization;
 using backend.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options => AssignmentJsonOptions.Configure(options.JsonSerializerOptions));
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
