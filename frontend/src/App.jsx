@@ -3,14 +3,18 @@ import { listTasks } from './api/tasks'
 import { AllAssignmentsDialog } from './components/assignments/AllAssignmentsDialog'
 import { AssignmentForm } from './components/assignments/AssignmentForm'
 import { WeeklyPlanner } from './components/assignments/WeeklyPlanner'
+import { BudgetForm } from './components/finance/BudgetForm'
+import { BudgetStrip } from './components/finance/BudgetStrip'
 import { DashboardHeader } from './components/layout/DashboardHeader'
 import { Sidebar } from './components/layout/Sidebar'
 import { ConfirmDialog } from './components/shared/ConfirmDialog'
 import { Dialog } from './components/shared/Dialog'
 import { useAssignments } from './hooks/useAssignments'
 import { useNextDeadline } from './hooks/useNextDeadline'
+import { useFinanceSummary } from './hooks/useFinanceSummary'
 import './App.css'
 import './styles/dialog.css'
+import './styles/budget.css'
 import { getWeekRange } from './utils/week'
 
 function App() {
@@ -26,6 +30,10 @@ function App() {
   const nextDeadline = useNextDeadline()
   const assignments = useAssignments({ start: week.start, end: week.end, onMutated: nextDeadline.refresh })
   const [announcement, setAnnouncement] = useState('')
+  const today = useMemo(() => new Date(), [])
+  const finances = useFinanceSummary({ year: today.getFullYear(), month: today.getMonth() + 1 })
+  const [budgetEditor, setBudgetEditor] = useState({ open: false, owner: 0 })
+  const budgetOwnerRef = useRef(0)
 
   useEffect(() => {
     mountedRef.current = true
@@ -115,6 +123,18 @@ function App() {
     openEditor(task)
   }
 
+  function openBudgetEditor() {
+    const owner = budgetOwnerRef.current + 1
+    budgetOwnerRef.current = owner
+    setBudgetEditor({ open: true, owner })
+  }
+
+  function closeBudgetEditor(expectedOwner) {
+    if (typeof expectedOwner === 'number' && budgetOwnerRef.current !== expectedOwner) return
+    budgetOwnerRef.current += 1
+    setBudgetEditor({ open: false, owner: budgetOwnerRef.current })
+  }
+
   return (
     <div className="dashboard-shell" id="dashboard">
       <div className="dashboard-layout">
@@ -132,6 +152,14 @@ function App() {
             onViewAll={openAllAssignments}
             tasks={assignments.tasks}
             nextTask={nextDeadline.task}
+          />
+          <BudgetStrip
+            summary={finances.summary}
+            status={finances.status}
+            error={finances.error}
+            onRetry={finances.refresh}
+            onAddExpense={() => setAnnouncement('Expense entry is coming next.')}
+            onEditBudget={openBudgetEditor}
           />
           <p className="sr-only" role="status">{announcement}</p>
         </main>
@@ -170,6 +198,20 @@ function App() {
         onClose={closeAllAssignments}
         onSelect={editFromAll}
       />
+
+      <Dialog
+        open={budgetEditor.open}
+        title="Monthly budget"
+        onClose={() => closeBudgetEditor()}
+      >
+        <BudgetForm
+          key={budgetEditor.owner}
+          initialAmount={finances.summary?.hasBudget ? finances.summary.budgetAmount : undefined}
+          onCancel={() => closeBudgetEditor()}
+          onSubmit={finances.saveBudget}
+          onSaved={() => { setAnnouncement('Monthly budget saved.'); closeBudgetEditor(budgetEditor.owner) }}
+        />
+      </Dialog>
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { act, cleanup, render, screen, waitFor, within } from '@testing-library/
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
+import { getFinanceSummary, putBudget } from './api/finance'
 import { createTask, deleteTask, listNextTasks, listTasks, updateTask } from './api/tasks'
 import { getWeekRange } from './utils/week'
 
@@ -11,6 +12,11 @@ vi.mock('./api/tasks', () => ({
   listTasks: vi.fn(),
   listNextTasks: vi.fn(),
   updateTask: vi.fn(),
+}))
+
+vi.mock('./api/finance', () => ({
+  getFinanceSummary: vi.fn(),
+  putBudget: vi.fn(),
 }))
 
 function deferred() {
@@ -44,6 +50,17 @@ afterEach(() => {
 
 beforeEach(() => {
   listNextTasks.mockResolvedValue([])
+  getFinanceSummary.mockResolvedValue({
+    year: 2026,
+    month: 8,
+    budgetAmount: 0,
+    totalSpent: 0,
+    remaining: 0,
+    isOverBudget: false,
+    hasBudget: false,
+    categories: [],
+  })
+  putBudget.mockResolvedValue({ amount: 600 })
 })
 
 describe('App', () => {
