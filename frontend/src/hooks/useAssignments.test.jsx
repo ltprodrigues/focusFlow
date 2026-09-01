@@ -98,4 +98,26 @@ describe('useAssignments', () => {
     await expect(mutation).rejects.toThrow('offline')
     expect(listTasks).toHaveBeenCalledOnce()
   })
+
+  it.each([
+    ['create', createTask, { title: 'Research essay' }],
+    ['update', updateTask, 8, { title: 'Research essay' }],
+    ['remove', deleteTask, 8],
+  ])('does not refresh when a pending %s mutation settles after unmount', async (method, apiCall, ...args) => {
+    const mutation = deferred()
+    listTasks.mockResolvedValue([])
+    apiCall.mockReturnValue(mutation.promise)
+    const { result, unmount } = renderHook(() => useAssignments(firstRange))
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    let pendingMutation
+    act(() => {
+      pendingMutation = result.current[method](...args)
+    })
+    unmount()
+    await act(async () => mutation.resolve({ id: 8 }))
+    await pendingMutation
+
+    expect(listTasks).toHaveBeenCalledOnce()
+  })
 })

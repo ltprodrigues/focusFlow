@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Dialog } from './Dialog'
 
-export function ConfirmDialog({ open, title, message, confirmLabel = 'Confirm', onConfirm, onCancel }) {
+export function ConfirmDialog({ open, title, message, confirmLabel = 'Confirm', onConfirm, onCancel, fallbackFocusRef }) {
   const [isWorking, setIsWorking] = useState(false)
   const [error, setError] = useState('')
 
@@ -24,7 +24,7 @@ export function ConfirmDialog({ open, title, message, confirmLabel = 'Confirm', 
   }
 
   return (
-    <Dialog open={open} title={title} onClose={handleCancel} className="confirm-dialog">
+    <Dialog open={open} title={title} onClose={handleCancel} className="confirm-dialog" dismissible={!isWorking} fallbackFocusRef={fallbackFocusRef}>
       <p>{message}</p>
       {error && <p className="form-error" role="alert">{error}</p>}
       <div className="form-actions">

@@ -17,6 +17,7 @@ export function useAssignments({ start, end }) {
   const range = useMemo(() => ({ start: new Date(startIso), end: new Date(endIso) }), [endIso, startIso])
   const [result, setResult] = useState({ rangeKey: null, tasks: [], status: 'loading', error: '' })
   const activeRangeRef = useRef({ range, rangeKey })
+  const mountedRef = useRef(false)
   const requestRef = useRef({ controller: null, id: 0 })
 
   const abortRequest = useCallback(() => {
@@ -25,6 +26,7 @@ export function useAssignments({ start, end }) {
   }, [])
 
   const load = useCallback(async (nextRange, nextRangeKey) => {
+    if (!mountedRef.current) return
     requestRef.current.controller?.abort()
     const controller = new AbortController()
     const id = requestRef.current.id + 1
@@ -32,15 +34,23 @@ export function useAssignments({ start, end }) {
 
     try {
       const items = await listTasks({ ...requestRange(nextRange), signal: controller.signal })
-      if (requestRef.current.id === id) {
+      if (mountedRef.current && requestRef.current.id === id) {
         setResult({ rangeKey: nextRangeKey, tasks: items, status: 'ready', error: '' })
       }
     } catch (requestError) {
-      if (requestRef.current.id === id && requestError.name !== 'AbortError') {
+      if (mountedRef.current && requestRef.current.id === id && requestError.name !== 'AbortError') {
         setResult({ rangeKey: nextRangeKey, tasks: [], status: 'error', error: 'Assignments could not load.' })
       }
     }
   }, [])
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      abortRequest()
+    }
+  }, [abortRequest])
 
   useEffect(() => {
     activeRangeRef.current = { range, rangeKey }
@@ -50,12 +60,12 @@ export function useAssignments({ start, end }) {
     requestRef.current = { controller, id }
     listTasks({ ...requestRange(range), signal: controller.signal })
       .then((items) => {
-        if (requestRef.current.id === id) {
+        if (mountedRef.current && requestRef.current.id === id) {
           setResult({ rangeKey, tasks: items, status: 'ready', error: '' })
         }
       })
       .catch((requestError) => {
-        if (requestRef.current.id === id && requestError.name !== 'AbortError') {
+        if (mountedRef.current && requestRef.current.id === id && requestError.name !== 'AbortError') {
           setResult({ rangeKey, tasks: [], status: 'error', error: 'Assignments could not load.' })
         }
       })
@@ -63,23 +73,24 @@ export function useAssignments({ start, end }) {
   }, [abortRequest, range, rangeKey])
 
   const refresh = useCallback(() => {
+    if (!mountedRef.current) return Promise.resolve()
     const active = activeRangeRef.current
     return load(active.range, active.rangeKey)
   }, [load])
 
   const create = useCallback(async (input) => {
     await createTask(input)
-    await refresh()
+    if (mountedRef.current) await refresh()
   }, [refresh])
 
   const update = useCallback(async (id, input) => {
     await updateTask(id, input)
-    await refresh()
+    if (mountedRef.current) await refresh()
   }, [refresh])
 
   const remove = useCallback(async (id) => {
     await deleteTask(id)
-    await refresh()
+    if (mountedRef.current) await refresh()
   }, [refresh])
 
   const retry = useCallback(() => {

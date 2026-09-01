@@ -100,10 +100,12 @@ describe('App', () => {
     await user.type(screen.getByLabelText('Notes'), 'Read chapters 4 and 5')
     await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
+    const localOffset = new Date(2026, 8, 2, 14, 30).getTimezoneOffset()
+    const exactDueDate = new Date(Date.UTC(2026, 8, 2, 14, 30) + localOffset * 60_000).toISOString()
     await waitFor(() => expect(createTask).toHaveBeenCalledWith({
       title: 'Research essay',
       course: 'English',
-      dueDate: expect.stringMatching(/^2026-09-02T\d\d:30:00\.000Z$/),
+      dueDate: exactDueDate,
       priority: 'High',
       isCompleted: false,
       notes: 'Read chapters 4 and 5',
@@ -183,6 +185,135 @@ describe('App', () => {
     expect(screen.getByDisplayValue('Research essay')).toBeInTheDocument()
   })
 
+  it('does not let assignment A finishing late close assignment B', async () => {
+    const user = userEvent.setup()
+    const firstTask = currentWeekTask('Assignment A')
+    const secondTask = currentWeekTask('Assignment B', 1)
+    const mutation = deferred()
+    listTasks.mockResolvedValueOnce([firstTask, secondTask]).mockResolvedValueOnce([firstTask, secondTask])
+    updateTask.mockReturnValue(mutation.promise)
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: /Assignment A/ }))
+    await user.click(screen.getByRole('button', { name: 'Save assignment' }))
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(screen.getByRole('button', { name: /Assignment B/ }))
+
+    await act(async () => mutation.resolve(null))
+    await waitFor(() => expect(listTasks).toHaveBeenCalledTimes(2))
+    expect(screen.getByRole('dialog', { name: 'Edit assignment' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Title')).toHaveValue('Assignment B')
+  })
+
+  it('retains rejected delete confirmation and supports retry', async () => {
+    const user = userEvent.setup()
+    const task = currentWeekTask('Research essay')
+    listTasks.mockResolvedValueOnce([task]).mockResolvedValueOnce([])
+    deleteTask.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(null)
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: /Research essay/ }))
+    await user.click(screen.getByRole('button', { name: 'Delete assignment' }))
+    let confirmation = screen.getByRole('dialog', { name: 'Delete assignment?' })
+    await user.click(within(confirmation).getByRole('button', { name: 'Delete assignment' }))
+
+    expect(await within(confirmation).findByText('Could not delete the assignment. Try again.')).toBeInTheDocument()
+    confirmation = screen.getByRole('dialog', { name: 'Delete assignment?' })
+    await user.click(within(confirmation).getByRole('button', { name: 'Delete assignment' }))
+
+    await waitFor(() => expect(deleteTask).toHaveBeenCalledTimes(2))
+    expect(screen.queryByRole('dialog', { name: 'Delete assignment?' })).not.toBeInTheDocument()
+  })
+
+  it('exposes only confirmation and traps Escape and Tab in its active layer while deletion is pending', async () => {
+    const user = userEvent.setup()
+    const task = currentWeekTask('Research essay')
+    const mutation = deferred()
+    listTasks.mockResolvedValue([task])
+    deleteTask.mockReturnValue(mutation.promise)
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: /Research essay/ }))
+    await user.click(screen.getByRole('button', { name: 'Delete assignment' }))
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    const hiddenEditor = screen.getByRole('dialog', { name: 'Edit assignment', hidden: true })
+    expect(hiddenEditor.closest('.dialog-backdrop')).toHaveAttribute('aria-hidden', 'true')
+    expect(hiddenEditor.closest('.dialog-backdrop')).toHaveAttribute('inert')
+
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: 'Delete assignment?' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Edit assignment' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Delete assignment' }))
+    const confirmation = screen.getByRole('dialog', { name: 'Delete assignment?' })
+    await user.click(within(confirmation).getByRole('button', { name: 'Delete assignment' }))
+    expect(within(confirmation).getByRole('button', { name: 'Deleting…' })).toBeDisabled()
+
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('dialog', { name: 'Delete assignment?' })).toBeInTheDocument()
+    await user.tab()
+    expect(confirmation).toContainElement(document.activeElement)
+
+    const backgroundOpener = screen.getByRole('button', { name: /Add assignment/ })
+    backgroundOpener.focus()
+    await user.tab()
+    expect(confirmation).toContainElement(document.activeElement)
+
+    await act(async () => mutation.reject(new Error('offline')))
+  })
+
+  it('restores focus to Add assignment when deletion removes the selected card', async () => {
+    const user = userEvent.setup()
+    const task = currentWeekTask('Research essay')
+    listTasks.mockResolvedValueOnce([task]).mockResolvedValueOnce([])
+    deleteTask.mockResolvedValue(null)
+    render(<App />)
+    const fallback = screen.getByRole('button', { name: /Add assignment/ })
+
+    await user.click(await screen.findByRole('button', { name: /Research essay/ }))
+    await user.click(screen.getByRole('button', { name: 'Delete assignment' }))
+    await user.click(within(screen.getByRole('dialog', { name: 'Delete assignment?' })).getByRole('button', { name: 'Delete assignment' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(fallback).toHaveFocus()
+  })
+
+  it('ignores and aborts a late all-assignment response after close', async () => {
+    const user = userEvent.setup()
+    const late = deferred()
+    const current = currentWeekTask('Current all record')
+    listTasks.mockResolvedValueOnce([]).mockReturnValueOnce(late.promise).mockResolvedValueOnce([current])
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /View all assignments/ }))
+    const requestOptions = listTasks.mock.calls[1][0]
+    expect(requestOptions).toEqual(expect.objectContaining({ signal: expect.anything() }))
+    expect(requestOptions).not.toHaveProperty('from')
+    expect(requestOptions).not.toHaveProperty('to')
+    await user.click(screen.getByRole('button', { name: 'Close all assignments' }))
+    expect(requestOptions.signal.aborted).toBe(true)
+    await act(async () => late.resolve([currentWeekTask('Late all record')]))
+
+    await user.click(screen.getByRole('button', { name: /View all assignments/ }))
+    expect(await screen.findByRole('button', { name: /Current all record/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Late all record/ })).not.toBeInTheDocument()
+  })
+
+  it('aborts and ignores a late all-assignment response after unmount', async () => {
+    const user = userEvent.setup()
+    const late = deferred()
+    listTasks.mockResolvedValueOnce([]).mockReturnValueOnce(late.promise)
+    const { unmount } = render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /View all assignments/ }))
+    const requestOptions = listTasks.mock.calls[1][0]
+    expect(requestOptions).toEqual(expect.objectContaining({ signal: expect.anything() }))
+    unmount()
+    expect(requestOptions.signal.aborted).toBe(true)
+    await act(async () => late.resolve([currentWeekTask('Late all record')]))
+  })
+
   it.each([
     ['weekday', currentWeekTask('Weekday essay')],
     ['weekend', currentWeekTask('Weekend reading', 6)],
@@ -194,7 +325,10 @@ describe('App', () => {
     render(<App />)
 
     await user.click(screen.getByRole('button', { name: /View all assignments/ }))
-    expect(listTasks).toHaveBeenNthCalledWith(2)
+    const requestOptions = listTasks.mock.calls[1][0]
+    expect(requestOptions).toEqual(expect.objectContaining({ signal: expect.anything() }))
+    expect(requestOptions).not.toHaveProperty('from')
+    expect(requestOptions).not.toHaveProperty('to')
     const allDialog = await screen.findByRole('dialog', { name: 'All assignments' })
     await user.click(within(allDialog).getByRole('button', { name: new RegExp(selectedTask.title) }))
 
