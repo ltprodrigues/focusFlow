@@ -13,10 +13,12 @@ namespace backend.Controllers;
 public class ExpensesController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
+    private readonly backend.Services.ICurrentUserService _currentUser;
 
-    public ExpensesController(ApplicationDbContext context)
+    public ExpensesController(ApplicationDbContext context, backend.Services.ICurrentUserService currentUser)
     {
         _context = context;
+        _currentUser = currentUser;
     }
 
 
@@ -39,15 +41,16 @@ public class ExpensesController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<Expense>> CreateExpense(CreateExpenseDto request)
+    public async Task<ActionResult<Expense>> CreateExpense(UpsertExpenseDto request)
     {
         var expense = new Expense
         {
-            Title = request.Title,
+            Title = request.Title!,
             Amount = request.Amount,
-            Category = request.Category,
-            Date = request.Date,
-            UserId = request.UserId
+            Category = request.Category!,
+            Date = request.Date!.Value,
+            Notes = request.Notes,
+            UserId = _currentUser.UserId
         };
 
         _context.Expenses.Add(expense);
