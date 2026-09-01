@@ -14,6 +14,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddScoped<ICurrentUserService, DemoCurrentUserService>();
+builder.Services.AddScoped<IFinanceSummaryService, FinanceSummaryService>();
 
 const string DevelopmentCorsPolicy = "DevelopmentFrontend";
 if (builder.Environment.IsDevelopment())
