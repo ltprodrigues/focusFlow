@@ -22,9 +22,9 @@ function getNextTask(tasks, now) {
 }
 
 export function WeeklyPlanner({
-  days = [], tasks = [], isLoading = false, error, now = new Date(), onPreviousWeek, onNextWeek, onSelectTask, onRetry, onViewAll,
+  days = [], tasks = [], nextTask: suppliedNextTask, isLoading = false, error, now = new Date(), onPreviousWeek, onNextWeek, onSelectTask, onRetry, onViewAll,
 }) {
-  const nextTask = getNextTask(tasks, now)
+  const nextTask = suppliedNextTask === undefined ? getNextTask(tasks, now) : suppliedNextTask
 
   return (
     <section className="planner-card" aria-labelledby="planner-heading">

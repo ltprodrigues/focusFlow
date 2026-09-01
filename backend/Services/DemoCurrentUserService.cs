@@ -2,8 +2,14 @@ using Microsoft.Extensions.Configuration;
 
 namespace backend.Services;
 
-public sealed class DemoCurrentUserService(IConfiguration configuration)
-    : ICurrentUserService
+public sealed class DemoCurrentUserService : ICurrentUserService
 {
-    public int UserId { get; } = configuration.GetValue<int>("DemoUser:Id");
+    public DemoCurrentUserService(IConfiguration configuration)
+    {
+        UserId = configuration.GetValue<int>("DemoUser:Id");
+        if (UserId <= 0)
+            throw new InvalidOperationException("DemoUser:Id must be a positive integer.");
+    }
+
+    public int UserId { get; }
 }

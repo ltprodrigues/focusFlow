@@ -15,6 +15,10 @@ export function listTasks({ from, to, signal } = {}) {
   return request(`/api/tasks${query}`, { signal })
 }
 
+export function listNextTasks({ from, signal }) {
+  return listTasks({ from, signal })
+}
+
 export function createTask(input) {
   return request('/api/tasks', {
     method: 'POST',

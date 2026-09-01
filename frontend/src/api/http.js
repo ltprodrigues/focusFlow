@@ -15,7 +15,16 @@ export async function request(path, options = {}) {
       headers: { 'Content-Type': 'application/json', ...options.headers },
     },
   )
-  const body = response.status === 204 ? null : await response.json()
+  let body = null
+  if (response.status !== 204) {
+    const contentType = response.headers?.get?.('content-type') ?? ''
+    if (contentType.includes('json') || !response.text) {
+      body = await response.json()
+    } else {
+      const message = await response.text()
+      body = { title: message || `Request failed with status ${response.status}` }
+    }
+  }
 
   if (!response.ok) {
     throw new ApiError(response.status, body)

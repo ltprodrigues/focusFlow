@@ -8,6 +8,7 @@ import { Sidebar } from './components/layout/Sidebar'
 import { ConfirmDialog } from './components/shared/ConfirmDialog'
 import { Dialog } from './components/shared/Dialog'
 import { useAssignments } from './hooks/useAssignments'
+import { useNextDeadline } from './hooks/useNextDeadline'
 import './App.css'
 import './styles/dialog.css'
 import { getWeekRange } from './utils/week'
@@ -22,7 +23,9 @@ function App() {
   const mountedRef = useRef(false)
   const allRequestRef = useRef({ controller: null, id: 0 })
   const week = useMemo(() => getWeekRange(weekDate), [weekDate])
-  const assignments = useAssignments({ start: week.start, end: week.end })
+  const nextDeadline = useNextDeadline()
+  const assignments = useAssignments({ start: week.start, end: week.end, onMutated: nextDeadline.refresh })
+  const [announcement, setAnnouncement] = useState('')
 
   useEffect(() => {
     mountedRef.current = true
@@ -60,8 +63,10 @@ function App() {
     const owner = editor.owner
     if (editor.task) {
       await assignments.update(editor.task.id, payload)
+      setAnnouncement('Assignment updated.')
     } else {
       await assignments.create(payload)
+      setAnnouncement('Assignment created.')
     }
     closeEditor(owner)
   }
@@ -69,6 +74,7 @@ function App() {
   async function deleteAssignment() {
     const owner = editor.owner
     await assignments.remove(editor.task.id)
+    setAnnouncement('Assignment deleted.')
     closeEditor(owner)
   }
 
@@ -125,7 +131,9 @@ function App() {
             onSelectTask={openEditor}
             onViewAll={openAllAssignments}
             tasks={assignments.tasks}
+            nextTask={nextDeadline.task}
           />
+          <p className="sr-only" role="status">{announcement}</p>
         </main>
       </div>
 

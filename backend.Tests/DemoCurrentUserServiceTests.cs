@@ -16,4 +16,11 @@ public class DemoCurrentUserServiceTests
 
         Assert.Equal(7, service.UserId);
     }
+
+    [Fact]
+    public void Constructor_RejectsMissingDemoUser()
+    {
+        var config = new ConfigurationBuilder().AddInMemoryCollection().Build();
+        Assert.Throws<InvalidOperationException>(() => new DemoCurrentUserService(config));
+    }
 }

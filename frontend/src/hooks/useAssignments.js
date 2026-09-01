@@ -10,7 +10,7 @@ function requestRange(range) {
   }
 }
 
-export function useAssignments({ start, end }) {
+export function useAssignments({ start, end, onMutated }) {
   const startIso = new Date(start).toISOString()
   const endIso = new Date(end).toISOString()
   const rangeKey = `${startIso}|${endIso}`
@@ -80,18 +80,18 @@ export function useAssignments({ start, end }) {
 
   const create = useCallback(async (input) => {
     await createTask(input)
-    if (mountedRef.current) await refresh()
-  }, [refresh])
+    if (mountedRef.current) await Promise.all([refresh(), onMutated?.()])
+  }, [onMutated, refresh])
 
   const update = useCallback(async (id, input) => {
     await updateTask(id, input)
-    if (mountedRef.current) await refresh()
-  }, [refresh])
+    if (mountedRef.current) await Promise.all([refresh(), onMutated?.()])
+  }, [onMutated, refresh])
 
   const remove = useCallback(async (id) => {
     await deleteTask(id)
-    if (mountedRef.current) await refresh()
-  }, [refresh])
+    if (mountedRef.current) await Promise.all([refresh(), onMutated?.()])
+  }, [onMutated, refresh])
 
   const retry = useCallback(() => {
     const active = activeRangeRef.current

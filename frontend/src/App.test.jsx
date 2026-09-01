@@ -1,14 +1,15 @@
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import { createTask, deleteTask, listTasks, updateTask } from './api/tasks'
+import { createTask, deleteTask, listNextTasks, listTasks, updateTask } from './api/tasks'
 import { getWeekRange } from './utils/week'
 
 vi.mock('./api/tasks', () => ({
   createTask: vi.fn(),
   deleteTask: vi.fn(),
   listTasks: vi.fn(),
+  listNextTasks: vi.fn(),
   updateTask: vi.fn(),
 }))
 
@@ -41,7 +42,32 @@ afterEach(() => {
   vi.resetAllMocks()
 })
 
+beforeEach(() => {
+  listNextTasks.mockResolvedValue([])
+})
+
 describe('App', () => {
+  it('loads the next deadline independently of the viewed week and refreshes it after a mutation', async () => {
+    const user = userEvent.setup()
+    const viewed = currentWeekTask('Viewed task')
+    const next = { ...currentWeekTask('Future deadline', 14), id: 'future' }
+    listTasks.mockResolvedValueOnce([viewed]).mockResolvedValueOnce([])
+    listNextTasks.mockResolvedValueOnce([next]).mockResolvedValueOnce([])
+    updateTask.mockResolvedValue(null)
+
+    render(<App />)
+
+    expect(await screen.findByText((_, element) => element?.classList.contains('next-deadline') && element.textContent.includes('Future deadline'))).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Viewed task/ }))
+    await user.click(screen.getByRole('checkbox', { name: 'Completed' }))
+    await user.click(screen.getByRole('button', { name: 'Save assignment' }))
+
+    await waitFor(() => expect(listTasks).toHaveBeenCalledTimes(2))
+    expect(screen.getByText((_, element) => element?.classList.contains('next-deadline') && element.textContent.includes('No upcoming assignments'))).toBeInTheDocument()
+    expect(listNextTasks.mock.calls[0][0]).toEqual(expect.objectContaining({ from: expect.any(String), signal: expect.anything() }))
+    expect(listNextTasks.mock.calls[0][0]).not.toHaveProperty('to')
+  })
+
   it('does not let a retry that resolves after week navigation overwrite the active range', async () => {
     const initial = deferred()
     const retry = deferred()

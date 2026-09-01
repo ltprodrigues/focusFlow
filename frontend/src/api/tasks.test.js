@@ -15,6 +15,20 @@ function jsonResponse(body, status = 200) {
 }
 
 describe('listTasks', () => {
+  it('reports useful text when an error response is not JSON', async () => {
+    const fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      headers: { get: () => 'text/plain' },
+      text: vi.fn().mockResolvedValue('Gateway unavailable'),
+    })
+    vi.stubGlobal('fetch', fetch)
+
+    await expect(listTasks()).rejects.toEqual(expect.objectContaining({
+      name: 'ApiError', status: 502, message: 'Gateway unavailable',
+    }))
+  })
+
   it('encodes both ISO range values', async () => {
     const fetch = vi.fn().mockResolvedValue(jsonResponse([]))
     vi.stubGlobal('fetch', fetch)

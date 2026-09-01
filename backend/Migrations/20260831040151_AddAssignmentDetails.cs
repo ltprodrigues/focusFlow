@@ -19,7 +19,7 @@ namespace backend.Migrations
                 table: "StudyTasks",
                 type: "text",
                 nullable: false,
-                defaultValue: "");
+                defaultValue: "General");
 
             migrationBuilder.AddColumn<string>(
                 name: "Notes",

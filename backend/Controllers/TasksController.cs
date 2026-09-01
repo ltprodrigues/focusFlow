@@ -57,11 +57,11 @@ public sealed class TasksController(
     {
         var task = new StudyTask
         {
-            Title = request.Title,
-            Course = request.Course,
+            Title = request.Title!,
+            Course = request.Course!,
             Notes = request.Notes,
-            DueDate = request.DueDate,
-            Priority = request.Priority,
+            DueDate = request.DueDate!.Value,
+            Priority = request.Priority!.Value,
             IsCompleted = request.IsCompleted,
             UserId = currentUser.UserId
         };
@@ -81,11 +81,11 @@ public sealed class TasksController(
         if (task is null)
             return NotFound();
 
-        task.Title = request.Title;
-        task.Course = request.Course;
+        task.Title = request.Title!;
+        task.Course = request.Course!;
         task.Notes = request.Notes;
-        task.DueDate = request.DueDate;
-        task.Priority = request.Priority;
+        task.DueDate = request.DueDate!.Value;
+        task.Priority = request.Priority!.Value;
         task.IsCompleted = request.IsCompleted;
 
         await db.SaveChangesAsync();
