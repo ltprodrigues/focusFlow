@@ -294,6 +294,8 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Close all assignments' }))
     expect(requestOptions.signal.aborted).toBe(true)
     await act(async () => late.resolve([currentWeekTask('Late all record')]))
+    expect(screen.queryByRole('dialog', { name: 'All assignments' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Late all record/ })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /View all assignments/ }))
     expect(await screen.findByRole('button', { name: /Current all record/ })).toBeInTheDocument()
