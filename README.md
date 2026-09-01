@@ -1,44 +1,59 @@
-\# FocusFlow
+# FocusFlow
 
+FocusFlow helps students organize assignments, deadlines, and personal expenses in one dashboard. The current development milestone includes the weekly assignment planner backed by ASP.NET Core and PostgreSQL.
 
+## Tech stack
 
-FocusFlow is a fullstack web application designed to help students and young professionals manage their study goals, deadlines, and personal expenses in one dashboard.
+- React and Vite
+- ASP.NET Core Web API
+- PostgreSQL with Entity Framework Core
 
+## Local setup
 
+### 1. Configure PostgreSQL
 
-\## Tech Stack
+Create a local PostgreSQL database for FocusFlow. Set the `ConnectionStrings__DefaultConnection` environment variable to a PostgreSQL connection string for that database. Keep local credentials in environment variables or user secrets; do not commit them.
 
+Apply the migrations from the repository root:
 
+```powershell
+dotnet ef database update --project backend
+```
 
-\- Frontend: React
+### 2. Start the API
 
-\- Backend: ASP.NET Core Web API
+```powershell
+dotnet run --project backend --launch-profile http
+```
 
-\- Database: PostgreSQL
+The development API runs at `http://localhost:5062`. On startup it applies pending migrations and creates demo user ID `1` if that user does not already exist. This development-only identity scopes assignments until account authentication is added.
 
-\- Version Control: Git \& GitHub
+### 3. Start the frontend
 
+In a second terminal:
 
+```powershell
+cd frontend
+Copy-Item .env.example .env
+npm install
+npm run dev
+```
 
-\## Main Features
+Open the Vite URL shown in the terminal (normally `http://localhost:5173`). The development API permits that configured origin only; production does not enable this policy.
 
+## Verification
 
+Run backend tests and build from the repository root:
 
-\- User authentication
+```powershell
+dotnet test backend.Tests/backend.Tests.csproj
+dotnet build backend/backend.csproj --no-restore
+```
 
-\- Study task tracking
+Run frontend checks from `frontend`:
 
-\- Expense tracking
-
-\- Dashboard summary
-
-\- Charts and analytics
-
-
-
-\## Project Status
-
-
-
-In development.
-
+```powershell
+npm test
+npm run lint
+npm run build
+```
