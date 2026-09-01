@@ -1,47 +1,60 @@
+using backend.Data;
+using backend.DTOs;
+using backend.Models;
+using backend.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-
-using backend.Data;
-using backend.Models;
-using backend.DTOs;
-
 
 namespace backend.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
-public class ExpensesController : ControllerBase
+[Route("api/expenses")]
+public sealed class ExpensesController(
+    ApplicationDbContext db,
+    ICurrentUserService currentUser) : ControllerBase
 {
-    private readonly ApplicationDbContext _context;
-    private readonly backend.Services.ICurrentUserService _currentUser;
-
-    public ExpensesController(ApplicationDbContext context, backend.Services.ICurrentUserService currentUser)
-    {
-        _context = context;
-        _currentUser = currentUser;
-    }
-
-
     [HttpGet]
-    public async Task<ActionResult<List<Expense>>> GetExpenses()
+    public async Task<ActionResult<List<ExpenseDto>>> GetExpenses(
+        int year,
+        int month,
+        CancellationToken cancellationToken = default)
     {
-        return await _context.Expenses.ToListAsync();
+        if (!IsValidPeriod(year, month))
+            return InvalidPeriod();
+
+        var start = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var end = start.AddMonths(1);
+
+        return await db.Expenses
+            .AsNoTracking()
+            .Where(expense =>
+                expense.UserId == currentUser.UserId &&
+                expense.Date >= start &&
+                expense.Date < end)
+            .OrderByDescending(expense => expense.Date)
+            .ThenByDescending(expense => expense.Id)
+            .Select(expense => ToDto(expense))
+            .ToListAsync(cancellationToken);
     }
 
-
-    [HttpGet("{id}")]
-    public async Task<ActionResult<Expense>> GetExpense(int id)
+    [HttpGet("{id:int}")]
+    public async Task<ActionResult<ExpenseDto>> GetExpense(
+        int id,
+        CancellationToken cancellationToken = default)
     {
-        var expense = await _context.Expenses.FindAsync(id);
+        var expense = await db.Expenses
+            .AsNoTracking()
+            .Where(expense => expense.Id == id && expense.UserId == currentUser.UserId)
+            .Select(expense => ToDto(expense))
+            .SingleOrDefaultAsync(cancellationToken);
 
-        if (expense == null)
-            return NotFound();
-
-        return expense;
+        return expense is null ? NotFound() : expense;
     }
 
     [HttpPost]
-    public async Task<ActionResult<Expense>> CreateExpense(UpsertExpenseDto request)
+    public async Task<ActionResult<ExpenseDto>> CreateExpense(
+        UpsertExpenseDto request,
+        CancellationToken cancellationToken = default)
     {
         var expense = new Expense
         {
@@ -50,52 +63,67 @@ public class ExpensesController : ControllerBase
             Category = request.Category!,
             Date = request.Date!.Value,
             Notes = request.Notes,
-            UserId = _currentUser.UserId
+            UserId = currentUser.UserId
         };
 
-        _context.Expenses.Add(expense);
-        await _context.SaveChangesAsync();
+        db.Expenses.Add(expense);
+        await db.SaveChangesAsync(cancellationToken);
 
-        return CreatedAtAction(nameof(GetExpense), new { id = expense.Id }, expense);
+        return CreatedAtAction(nameof(GetExpense), new { id = expense.Id }, ToDto(expense));
     }
 
-
-    [HttpPut("{id}")]
+    [HttpPut("{id:int}")]
     public async Task<IActionResult> UpdateExpense(
         int id,
-        Expense expense)
+        UpsertExpenseDto request,
+        CancellationToken cancellationToken = default)
     {
-        if (id != expense.Id)
-            return BadRequest();
+        var expense = await db.Expenses.SingleOrDefaultAsync(
+            expense => expense.Id == id && expense.UserId == currentUser.UserId,
+            cancellationToken);
 
-
-        _context.Entry(expense).State =
-            EntityState.Modified;
-
-
-        await _context.SaveChangesAsync();
-
-
-        return NoContent();
-    }
-
-
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteExpense(int id)
-    {
-        var expense =
-            await _context.Expenses.FindAsync(id);
-
-
-        if (expense == null)
+        if (expense is null)
             return NotFound();
 
+        expense.Title = request.Title!;
+        expense.Amount = request.Amount;
+        expense.Category = request.Category!;
+        expense.Date = request.Date!.Value;
+        expense.Notes = request.Notes;
 
-        _context.Expenses.Remove(expense);
-
-        await _context.SaveChangesAsync();
-
-
+        await db.SaveChangesAsync(cancellationToken);
         return NoContent();
     }
+
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> DeleteExpense(
+        int id,
+        CancellationToken cancellationToken = default)
+    {
+        var expense = await db.Expenses.SingleOrDefaultAsync(
+            expense => expense.Id == id && expense.UserId == currentUser.UserId,
+            cancellationToken);
+
+        if (expense is null)
+            return NotFound();
+
+        db.Expenses.Remove(expense);
+        await db.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
+    private static ExpenseDto ToDto(Expense expense) => new(
+        expense.Id,
+        expense.Title,
+        expense.Amount,
+        expense.Category,
+        expense.Date,
+        expense.Notes);
+
+    private static bool IsValidPeriod(int year, int month) =>
+        year is >= 1 and <= 9998 && month is >= 1 and <= 12;
+
+    private ActionResult InvalidPeriod() => ValidationProblem(
+        detail: "Year must be between 1 and 9998 and month must be between 1 and 12.",
+        statusCode: StatusCodes.Status400BadRequest);
 }
