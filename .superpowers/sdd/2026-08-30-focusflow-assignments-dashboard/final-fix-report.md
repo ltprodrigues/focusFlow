@@ -31,4 +31,4 @@
 
 ## Commit
 
-- Recorded after commit below.
+- Functional stabilization and initial report: `6ad5cad` (`fix: stabilize assignment milestone`).
