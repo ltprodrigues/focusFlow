@@ -40,6 +40,7 @@ it('waits for save completion before requesting close', async () => {
   render(<BudgetForm initialAmount={600} onCancel={vi.fn()} onSaved={onSaved} onSubmit={() => save.promise} />)
   await user.click(screen.getByRole('button', { name: 'Save budget' }))
   expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
   expect(onSaved).not.toHaveBeenCalled()
   await act(async () => save.resolve())
   expect(onSaved).toHaveBeenCalledOnce()

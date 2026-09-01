@@ -359,6 +359,46 @@ describe('App', () => {
     await act(async () => late.resolve([currentWeekTask('Late all record')]))
   })
 
+  it('keeps ownership of the budget dialog while its save is pending', async () => {
+    const user = userEvent.setup()
+    const save = deferred()
+    listTasks.mockResolvedValue([])
+    getFinanceSummary.mockResolvedValue({
+      year: 2026, month: 9, budgetAmount: 0, totalSpent: 42, remaining: -42,
+      isOverBudget: true, hasBudget: false, categories: [{ category: 'Food', amount: 42 }],
+    })
+    putBudget.mockReturnValue(save.promise)
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: 'Set monthly budget' }))
+    const budgetDialog = screen.getByRole('dialog', { name: 'Monthly budget' })
+    await user.type(within(budgetDialog).getByLabelText('Monthly budget'), '600')
+    await user.click(within(budgetDialog).getByRole('button', { name: 'Save budget' }))
+    expect(within(budgetDialog).getByRole('button', { name: 'Cancel' })).toBeDisabled()
+    expect(within(budgetDialog).getByRole('button', { name: 'Close monthly budget' })).toBeDisabled()
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('dialog', { name: 'Monthly budget' })).toBeInTheDocument()
+    await user.click(budgetDialog.closest('.dialog-backdrop'))
+    expect(screen.getByRole('dialog', { name: 'Monthly budget' })).toBeInTheDocument()
+
+    await act(async () => save.resolve({ amount: 600 }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Monthly budget' })).not.toBeInTheDocument())
+  })
+
+  it('reinitializes an unsaved budget value when the dialog is reopened', async () => {
+    const user = userEvent.setup()
+    listTasks.mockResolvedValue([])
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Set monthly budget' }))
+    let budgetDialog = screen.getByRole('dialog', { name: 'Monthly budget' })
+    await user.type(within(budgetDialog).getByLabelText('Monthly budget'), '321')
+    await user.click(within(budgetDialog).getByRole('button', { name: 'Cancel' }))
+
+    await user.click(screen.getByRole('button', { name: 'Set monthly budget' }))
+    budgetDialog = screen.getByRole('dialog', { name: 'Monthly budget' })
+    expect(within(budgetDialog).getByLabelText('Monthly budget')).toHaveValue(null)
+  })
+
   it.each([
     ['weekday', currentWeekTask('Weekday essay')],
     ['weekend', currentWeekTask('Weekend reading', 6)],

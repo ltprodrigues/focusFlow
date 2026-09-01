@@ -1,7 +1,9 @@
-import { render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { expect, it, vi } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { BudgetStrip } from './BudgetStrip'
+
+afterEach(cleanup)
 
 const summary = {
   year: 2026,
@@ -35,14 +37,19 @@ it('shows an over-budget amount without clamping it', () => {
   expect(screen.getByText('$25.00 over budget')).toBeInTheDocument()
 })
 
-it('offers budget setup and distinguishes empty spending', async () => {
+it('keeps spending details and expense entry available before a budget is set', async () => {
   const user = userEvent.setup()
   const onEditBudget = vi.fn()
-  const { rerender } = render(<BudgetStrip summary={{ ...summary, hasBudget: false }} status="success" onEditBudget={onEditBudget} />)
+  render(<BudgetStrip summary={{ ...summary, hasBudget: false, budgetAmount: 0, remaining: -342, isOverBudget: true }} status="success" onAddExpense={vi.fn()} onEditBudget={onEditBudget} />)
+  expect(screen.getByText('$342.00')).toBeInTheDocument()
+  expect(screen.getByText('Food')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Add expense' })).toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'Set monthly budget' }))
   expect(onEditBudget).toHaveBeenCalledOnce()
+})
 
-  rerender(<BudgetStrip summary={{ ...summary, totalSpent: 0, remaining: 600, categories: [] }} status="success" />)
+it('distinguishes a month with no spending', () => {
+  render(<BudgetStrip summary={{ ...summary, totalSpent: 0, remaining: 600, categories: [] }} status="success" />)
   expect(screen.getByText('No spending yet this month.')).toBeInTheDocument()
 })
 

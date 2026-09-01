@@ -34,6 +34,7 @@ function App() {
   const finances = useFinanceSummary({ year: today.getFullYear(), month: today.getMonth() + 1 })
   const [budgetEditor, setBudgetEditor] = useState({ open: false, owner: 0 })
   const budgetOwnerRef = useRef(0)
+  const budgetSavingRef = useRef(false)
 
   useEffect(() => {
     mountedRef.current = true
@@ -126,13 +127,22 @@ function App() {
   function openBudgetEditor() {
     const owner = budgetOwnerRef.current + 1
     budgetOwnerRef.current = owner
-    setBudgetEditor({ open: true, owner })
+    budgetSavingRef.current = false
+    setBudgetEditor({ open: true, owner, saving: false })
   }
 
-  function closeBudgetEditor(expectedOwner) {
+  function closeBudgetEditor(expectedOwner, force = false) {
     if (typeof expectedOwner === 'number' && budgetOwnerRef.current !== expectedOwner) return
+    if (budgetSavingRef.current && !force) return
     budgetOwnerRef.current += 1
+    budgetSavingRef.current = false
     setBudgetEditor({ open: false, owner: budgetOwnerRef.current })
+  }
+
+  function setBudgetSaving(owner, saving) {
+    if (budgetOwnerRef.current !== owner) return
+    budgetSavingRef.current = saving
+    setBudgetEditor((current) => current.owner === owner ? { ...current, saving } : current)
   }
 
   return (
@@ -200,6 +210,7 @@ function App() {
       />
 
       <Dialog
+        dismissible={!budgetEditor.saving}
         open={budgetEditor.open}
         title="Monthly budget"
         onClose={() => closeBudgetEditor()}
@@ -209,7 +220,8 @@ function App() {
           initialAmount={finances.summary?.hasBudget ? finances.summary.budgetAmount : undefined}
           onCancel={() => closeBudgetEditor()}
           onSubmit={finances.saveBudget}
-          onSaved={() => { setAnnouncement('Monthly budget saved.'); closeBudgetEditor(budgetEditor.owner) }}
+          onSavingChange={(saving) => setBudgetSaving(budgetEditor.owner, saving)}
+          onSaved={() => { setAnnouncement('Monthly budget saved.'); closeBudgetEditor(budgetEditor.owner, true) }}
         />
       </Dialog>
     </div>

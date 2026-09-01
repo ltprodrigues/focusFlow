@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-export function BudgetForm({ initialAmount, onSubmit, onSaved, onCancel }) {
+export function BudgetForm({ initialAmount, onSubmit, onSaved, onCancel, onSavingChange }) {
   const [amount, setAmount] = useState(initialAmount ? String(initialAmount) : '')
   const [error, setError] = useState('')
   const [submitError, setSubmitError] = useState('')
@@ -16,6 +16,7 @@ export function BudgetForm({ initialAmount, onSubmit, onSaved, onCancel }) {
     setError('')
     setSubmitError('')
     setSaving(true)
+    onSavingChange?.(true)
     try {
       await onSubmit(parsed)
       onSaved?.()
@@ -23,6 +24,7 @@ export function BudgetForm({ initialAmount, onSubmit, onSaved, onCancel }) {
       if (requestError?.name !== 'AbortError') setSubmitError('Could not save the budget. Try again.')
     } finally {
       setSaving(false)
+      onSavingChange?.(false)
     }
   }
 
@@ -32,7 +34,7 @@ export function BudgetForm({ initialAmount, onSubmit, onSaved, onCancel }) {
       {error && <p className="field-error" id="budget-amount-error">{error}</p>}
       {submitError && <p className="form-error" role="alert">{submitError}</p>}
       <div className="form-actions">
-        <button type="button" onClick={onCancel}>Cancel</button>
+        <button type="button" onClick={onCancel} disabled={saving}>Cancel</button>
         <button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save budget'}</button>
       </div>
     </form>
