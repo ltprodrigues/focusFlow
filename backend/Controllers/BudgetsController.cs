@@ -58,8 +58,10 @@ public sealed class BudgetsController(
                 budget.Month == month,
             cancellationToken);
 
+        var inserted = false;
         if (budget is null)
         {
+            inserted = true;
             budget = new MonthlyBudget
             {
                 UserId = currentUser.UserId,
@@ -74,7 +76,29 @@ public sealed class BudgetsController(
             budget.Amount = request.Amount;
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException) when (inserted)
+        {
+            // A concurrent request can insert the same unique user/year/month key
+            // after our read. Detach the failed insert and update the winning row.
+            db.Entry(budget).State = EntityState.Detached;
+            budget = await db.MonthlyBudgets.SingleOrDefaultAsync(
+                candidate =>
+                    candidate.UserId == currentUser.UserId &&
+                    candidate.Year == year &&
+                    candidate.Month == month,
+                cancellationToken);
+
+            if (budget is null)
+                throw;
+
+            budget.Amount = request.Amount;
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
         return new UpsertMonthlyBudgetDto { Amount = budget.Amount };
     }
 

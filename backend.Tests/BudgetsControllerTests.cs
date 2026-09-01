@@ -2,7 +2,11 @@ using System.ComponentModel.DataAnnotations;
 using backend.Controllers;
 using backend.DTOs;
 using backend.Models;
+using backend.Data;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 public class BudgetsControllerTests
 {
@@ -84,5 +88,70 @@ public class BudgetsControllerTests
 
         Assert.False(Validator.TryValidateObject(request, new ValidationContext(request), results, true));
         Assert.Contains(results, x => x.MemberNames.Contains(nameof(request.Amount)));
+    }
+
+    [Fact]
+    public async Task PutBudget_RecoversWhenAnotherRequestInsertsTheSameOwnedPeriod()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var plainOptions = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using (var setup = new ApplicationDbContext(plainOptions))
+        {
+            await setup.Database.EnsureCreatedAsync();
+            setup.Users.Add(new User { Id = 1, Name = "Demo", Email = "demo@example.test" });
+            await setup.SaveChangesAsync();
+        }
+
+        var interceptor = new CompetingBudgetInsertInterceptor(plainOptions);
+        var racingOptions = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSqlite(connection)
+            .AddInterceptors(interceptor)
+            .Options;
+        await using var db = new ApplicationDbContext(racingOptions);
+        var controller = new BudgetsController(db, new FakeCurrentUserService(1));
+
+        var result = await controller.PutBudget(
+            2026,
+            8,
+            new UpsertMonthlyBudgetDto { Amount = 650m });
+
+        Assert.True(interceptor.InsertedCompetingBudget);
+        Assert.Equal(650m, result.Value!.Amount);
+        await using var verification = new ApplicationDbContext(plainOptions);
+        var persisted = await verification.MonthlyBudgets.SingleAsync();
+        Assert.Equal(1, persisted.UserId);
+        Assert.Equal(650m, persisted.Amount);
+    }
+
+    private sealed class CompetingBudgetInsertInterceptor(
+        DbContextOptions<ApplicationDbContext> competitorOptions) : SaveChangesInterceptor
+    {
+        public bool InsertedCompetingBudget { get; private set; }
+
+        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (InsertedCompetingBudget ||
+                eventData.Context is not ApplicationDbContext context ||
+                !context.ChangeTracker.Entries<MonthlyBudget>().Any(entry => entry.State == EntityState.Added))
+                return result;
+
+            InsertedCompetingBudget = true;
+            await using var competitor = new ApplicationDbContext(competitorOptions);
+            competitor.MonthlyBudgets.Add(new MonthlyBudget
+            {
+                UserId = 1,
+                Year = 2026,
+                Month = 8,
+                Amount = 500m
+            });
+            await competitor.SaveChangesAsync(cancellationToken);
+            return result;
+        }
     }
 }
