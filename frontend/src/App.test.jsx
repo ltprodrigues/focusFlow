@@ -1,7 +1,7 @@
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import App from './App'
+import App, { DashboardErrorBoundary } from './App'
 import { getFinanceSummary, putBudget } from './api/finance'
 import { createExpense, deleteExpense, listExpenses, updateExpense } from './api/expenses'
 import { createTask, deleteTask, listNextTasks, listTasks, updateTask } from './api/tasks'
@@ -73,6 +73,53 @@ beforeEach(() => {
 })
 
 describe('App', () => {
+  it('renders the complete planner and spending dashboard together', async () => {
+    listTasks.mockResolvedValue([currentWeekTask('Research outline')])
+    listNextTasks.mockResolvedValue([currentWeekTask('Research outline')])
+    getFinanceSummary.mockResolvedValue({
+      year: 2026, month: 9, budgetAmount: 650, totalSpent: 100, remaining: 550,
+      isOverBudget: false, hasBudget: true,
+      categories: [{ category: 'Food', amount: 40 }, { category: 'School', amount: 60 }],
+    })
+
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Your week at a glance' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'September budget' })).toBeInTheDocument()
+    expect(screen.getByText(/Due next:/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Add assignment/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add expense' })).toBeInTheDocument()
+    expect(document.querySelectorAll('.day-column')).toHaveLength(5)
+  })
+
+  it('keeps the planner usable when finance fails and retries only finance', async () => {
+    const user = userEvent.setup()
+    listTasks.mockResolvedValue([currentWeekTask('Visible assignment')])
+    getFinanceSummary.mockRejectedValueOnce(new Error('Finance unavailable')).mockResolvedValueOnce({
+      year: 2026, month: 9, budgetAmount: 650, totalSpent: 0, remaining: 650,
+      isOverBudget: false, hasBudget: true, categories: [],
+    })
+
+    render(<App />)
+
+    expect(await screen.findByRole('button', { name: /Visible assignment/ })).toBeInTheDocument()
+    expect(await screen.findByText('Finance unavailable')).toBeInTheDocument()
+    expect(listTasks).toHaveBeenCalledOnce()
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByRole('heading', { name: 'September budget' })).toBeInTheDocument()
+    expect(listTasks).toHaveBeenCalledOnce()
+    expect(getFinanceSummary).toHaveBeenCalledTimes(2)
+  })
+
+  it('contains unexpected rendering failures inside the dashboard shell', () => {
+    function BrokenSection() { throw new Error('render failed') }
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    render(<DashboardErrorBoundary><BrokenSection /></DashboardErrorBoundary>)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('FocusFlow could not display this page.')
+  })
+
   it('adds an expense from the strip, closes, and refreshes expenses and summary', async () => {
     const user = userEvent.setup()
     listTasks.mockResolvedValue([])

@@ -35,5 +35,5 @@
 .expense-delete-button:disabled { cursor: wait; opacity: .6; }
 @keyframes budget-pulse { 50% { opacity: .45; } }
 @media (max-width: 1050px) { .budget-strip { grid-template-columns: auto 1fr auto; } .budget-categories { grid-column: 1 / -1; } }
-@media (max-width: 800px) { .budget-strip { align-items: stretch; grid-template-columns: 1fr auto; } .budget-chart-group, .budget-totals, .budget-categories { grid-column: 1 / -1; } .budget-totals { justify-content: space-between; } .budget-categories { grid-template-columns: repeat(2, minmax(0, 1fr)); } .budget-category-secondary { display: none; } .budget-add-expense { grid-column: 2; grid-row: 1; } }
+@media (max-width: 800px) { .budget-strip { align-items: stretch; grid-template-columns: 1fr auto; } .budget-chart-group, .budget-totals, .budget-categories { grid-column: 1 / -1; } .budget-totals { justify-content: space-between; } .budget-categories { grid-template-columns: repeat(2, minmax(0, 1fr)); } .budget-categories > .budget-category-secondary { display: none; } .budget-add-expense { grid-column: 2; grid-row: 1; } }
 @media (max-width: 520px) { .budget-strip { display: flex; flex-direction: column; } .budget-add-expense, .budget-secondary-action { width: 100%; } .budget-totals { flex-wrap: wrap; } .expense-form-row { grid-template-columns: 1fr; } }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Component, useEffect, useMemo, useRef, useState } from 'react'
 import { listTasks } from './api/tasks'
 import { AllAssignmentsDialog } from './components/assignments/AllAssignmentsDialog'
 import { AssignmentForm } from './components/assignments/AssignmentForm'
@@ -20,7 +20,25 @@ import './styles/dialog.css'
 import './styles/budget.css'
 import { getWeekRange } from './utils/week'
 
-function App() {
+export class DashboardErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <main className="dashboard-fatal-error" role="alert"><h1>FocusFlow could not display this page.</h1><p>Refresh the page to try again.</p></main>
+    }
+    return this.props.children
+  }
+}
+
+function FocusFlowDashboard() {
   const [weekDate, setWeekDate] = useState(() => new Date())
   const [editor, setEditor] = useState({ open: false, task: null, owner: 0 })
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -32,7 +50,7 @@ function App() {
   const week = useMemo(() => getWeekRange(weekDate), [weekDate])
   const nextDeadline = useNextDeadline()
   const assignments = useAssignments({ start: week.start, end: week.end, onMutated: nextDeadline.refresh })
-  const [announcement, setAnnouncement] = useState('')
+  const [announcement, setAnnouncement] = useState({ id: 0, message: '' })
   const today = useMemo(() => new Date(), [])
   const finances = useFinanceSummary({ year: today.getFullYear(), month: today.getMonth() + 1 })
   const [budgetEditor, setBudgetEditor] = useState({ open: false, owner: 0 })
@@ -44,6 +62,10 @@ function App() {
   const [expenseEditor, setExpenseEditor] = useState({ open: false, expense: null, owner: 0, saving: false })
   const [expenseConfirmOpen, setExpenseConfirmOpen] = useState(false)
   const expenses = useExpenses({ year: today.getFullYear(), month: today.getMonth() + 1, onMutated: finances.refresh })
+
+  function announce(message) {
+    setAnnouncement((current) => ({ id: current.id + 1, message }))
+  }
 
   useEffect(() => {
     mountedRef.current = true
@@ -81,10 +103,10 @@ function App() {
     const owner = editor.owner
     if (editor.task) {
       await assignments.update(editor.task.id, payload)
-      setAnnouncement('Assignment updated.')
+      announce('Assignment updated.')
     } else {
       await assignments.create(payload)
-      setAnnouncement('Assignment created.')
+      announce('Assignment created.')
     }
     closeEditor(owner)
   }
@@ -92,7 +114,7 @@ function App() {
   async function deleteAssignment() {
     const owner = editor.owner
     await assignments.remove(editor.task.id)
-    setAnnouncement('Assignment deleted.')
+    announce('Assignment deleted.')
     closeEditor(owner)
   }
 
@@ -186,7 +208,7 @@ function App() {
     const owner = expenseEditor.owner
     await expenses.remove(expenseEditor.expense.id)
     if (expenseOwnerRef.current === owner) {
-      setAnnouncement('Expense deleted.')
+      announce('Expense deleted.')
       closeExpenseEditor(owner, true)
     }
   }
@@ -219,7 +241,7 @@ function App() {
             addExpenseRef={addExpenseRef}
           />
           <ExpenseList expenses={expenses.expenses} status={expenses.status} error={expenses.error} onRetry={expenses.retry} onSelect={openExpenseEditor} />
-          <p className="sr-only" role="status">{announcement}</p>
+          <p className="sr-only" key={announcement.id} role="status">{announcement.message}</p>
         </main>
       </div>
 
@@ -254,7 +276,7 @@ function App() {
           onSavingChange={(saving) => setExpenseSaving(expenseEditor.owner, saving)}
           onSaved={() => {
             const owner = expenseEditor.owner
-            setAnnouncement(expenseEditor.expense ? 'Expense updated.' : 'Expense created.')
+            announce(expenseEditor.expense ? 'Expense updated.' : 'Expense created.')
             closeExpenseEditor(owner, true)
           }}
         />
@@ -304,11 +326,15 @@ function App() {
           onCancel={() => closeBudgetEditor()}
           onSubmit={finances.saveBudget}
           onSavingChange={(saving) => setBudgetSaving(budgetEditor.owner, saving)}
-          onSaved={() => { setAnnouncement('Monthly budget saved.'); closeBudgetEditor(budgetEditor.owner, true) }}
+          onSaved={() => { announce('Monthly budget saved.'); closeBudgetEditor(budgetEditor.owner, true) }}
         />
       </Dialog>
     </div>
   )
+}
+
+function App() {
+  return <DashboardErrorBoundary><FocusFlowDashboard /></DashboardErrorBoundary>
 }
 
 export default App
