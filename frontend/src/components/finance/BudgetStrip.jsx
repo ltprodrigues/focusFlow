@@ -4,7 +4,7 @@ import { formatCad } from '../../utils/currency'
 
 const monthNames = new Intl.DateTimeFormat('en-CA', { month: 'long' })
 
-export function BudgetStrip({ summary, status, error, onRetry, onAddExpense, onEditBudget }) {
+export function BudgetStrip({ summary, status, error, onRetry, onAddExpense, onEditBudget, addExpenseRef }) {
   if (status === 'loading' || status === 'idle') {
     return <section className="budget-strip budget-strip-loading" aria-busy="true"><span className="budget-skeleton" />Loading monthly budget…</section>
   }
@@ -38,7 +38,7 @@ export function BudgetStrip({ summary, status, error, onRetry, onAddExpense, onE
           ? <p>No spending yet this month.</p>
           : categories.map((item, index) => <div className={index >= 2 ? 'budget-category-secondary' : undefined} key={item.category}><span>{item.category}</span><strong>{formatCad(item.amount)}</strong></div>)}
       </div>
-      <button className="budget-add-expense" type="button" onClick={onAddExpense}>Add expense</button>
+      <button className="budget-add-expense" ref={addExpenseRef} type="button" onClick={onAddExpense}>Add expense</button>
     </section>
   )
 }

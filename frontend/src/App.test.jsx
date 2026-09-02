@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { getFinanceSummary, putBudget } from './api/finance'
+import { createExpense, deleteExpense, listExpenses, updateExpense } from './api/expenses'
 import { createTask, deleteTask, listNextTasks, listTasks, updateTask } from './api/tasks'
 import { getWeekRange } from './utils/week'
 
@@ -17,6 +18,10 @@ vi.mock('./api/tasks', () => ({
 vi.mock('./api/finance', () => ({
   getFinanceSummary: vi.fn(),
   putBudget: vi.fn(),
+}))
+
+vi.mock('./api/expenses', () => ({
+  createExpense: vi.fn(), deleteExpense: vi.fn(), listExpenses: vi.fn(), updateExpense: vi.fn(),
 }))
 
 function deferred() {
@@ -61,9 +66,85 @@ beforeEach(() => {
     categories: [],
   })
   putBudget.mockResolvedValue({ amount: 600 })
+  listExpenses.mockResolvedValue([])
+  createExpense.mockResolvedValue({ id: 1 })
+  updateExpense.mockResolvedValue(null)
+  deleteExpense.mockResolvedValue(null)
 })
 
 describe('App', () => {
+  it('adds an expense from the strip, closes, and refreshes expenses and summary', async () => {
+    const user = userEvent.setup()
+    listTasks.mockResolvedValue([])
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Add expense' }))
+    const dialog = screen.getByRole('dialog', { name: 'New expense' })
+    await user.type(within(dialog).getByLabelText('Title'), 'Lunch')
+    await user.type(within(dialog).getByLabelText('Amount'), '14.50')
+    await user.selectOptions(within(dialog).getByLabelText('Category'), 'Food')
+    await user.click(within(dialog).getByRole('button', { name: 'Save expense' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New expense' })).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add expense' })).toHaveFocus())
+    expect(createExpense).toHaveBeenCalledWith(expect.objectContaining({ title: 'Lunch', amount: 14.5, category: 'Food' }), { signal: expect.anything() })
+    expect(listExpenses).toHaveBeenCalledTimes(2)
+    expect(getFinanceSummary).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps expense values and ownership while a save fails or resolves late', async () => {
+    const user = userEvent.setup()
+    const pending = deferred()
+    listTasks.mockResolvedValue([])
+    createExpense.mockReturnValueOnce(pending.promise).mockRejectedValueOnce(new Error('offline'))
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Add expense' }))
+    await user.type(screen.getByLabelText('Title'), 'Bus pass')
+    await user.type(screen.getByLabelText('Amount'), '28')
+    await user.selectOptions(screen.getByLabelText('Category'), 'Transport')
+    await user.click(screen.getByRole('button', { name: 'Save expense' }))
+    expect(screen.getByRole('button', { name: 'Close new expense' })).toBeDisabled()
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('dialog', { name: 'New expense' })).toBeInTheDocument()
+    await act(async () => pending.reject(new Error('offline')))
+    expect(await screen.findByText('Could not save the expense. Try again.')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Bus pass')).toBeInTheDocument()
+  })
+
+  it('opens a listed expense prefilled and updates it', async () => {
+    const user = userEvent.setup()
+    const expense = { id: 4, title: 'Rent', amount: 800, category: 'Housing', date: '2026-09-01T04:00:00Z', notes: 'September' }
+    listTasks.mockResolvedValue([])
+    listExpenses.mockResolvedValueOnce([expense]).mockResolvedValueOnce([expense])
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: /Edit Rent/ }))
+    expect(screen.getByRole('dialog', { name: 'Edit expense' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Title')).toHaveValue('Rent')
+    await user.click(screen.getByRole('button', { name: 'Save expense' }))
+    await waitFor(() => expect(updateExpense).toHaveBeenCalledWith(4, expect.objectContaining({ category: 'Housing' }), { signal: expect.anything() }))
+  })
+
+  it('cancels and reports failed expense deletion before a successful retry', async () => {
+    const user = userEvent.setup()
+    const expense = { id: 5, title: 'Book', amount: 42, category: 'School', date: '2026-09-02T04:00:00Z', notes: '' }
+    listTasks.mockResolvedValue([])
+    listExpenses.mockResolvedValueOnce([expense]).mockResolvedValueOnce([])
+    deleteExpense.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(null)
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: /Edit Book/ }))
+    await user.click(screen.getByRole('button', { name: 'Delete expense' }))
+    let confirmation = screen.getByRole('dialog', { name: 'Delete expense?' })
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    await user.click(within(confirmation).getByRole('button', { name: 'Cancel' }))
+    expect(deleteExpense).not.toHaveBeenCalled()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Delete expense' })).toHaveFocus())
+    await user.click(screen.getByRole('button', { name: 'Delete expense' }))
+    confirmation = screen.getByRole('dialog', { name: 'Delete expense?' })
+    await user.click(within(confirmation).getByRole('button', { name: 'Delete expense' }))
+    expect(await within(confirmation).findByText('Could not delete the expense. Try again.')).toBeInTheDocument()
+    await user.click(within(confirmation).getByRole('button', { name: 'Delete expense' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Delete expense?' })).not.toBeInTheDocument())
+    expect(deleteExpense).toHaveBeenCalledTimes(2)
+    expect(getFinanceSummary).toHaveBeenCalledTimes(2)
+  })
   it('loads the next deadline independently of the viewed week and refreshes it after a mutation', async () => {
     const user = userEvent.setup()
     const viewed = currentWeekTask('Viewed task')

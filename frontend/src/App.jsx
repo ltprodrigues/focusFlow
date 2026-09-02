@@ -5,6 +5,8 @@ import { AssignmentForm } from './components/assignments/AssignmentForm'
 import { WeeklyPlanner } from './components/assignments/WeeklyPlanner'
 import { BudgetForm } from './components/finance/BudgetForm'
 import { BudgetStrip } from './components/finance/BudgetStrip'
+import { ExpenseForm } from './components/finance/ExpenseForm'
+import { ExpenseList } from './components/finance/ExpenseList'
 import { DashboardHeader } from './components/layout/DashboardHeader'
 import { Sidebar } from './components/layout/Sidebar'
 import { ConfirmDialog } from './components/shared/ConfirmDialog'
@@ -12,6 +14,7 @@ import { Dialog } from './components/shared/Dialog'
 import { useAssignments } from './hooks/useAssignments'
 import { useNextDeadline } from './hooks/useNextDeadline'
 import { useFinanceSummary } from './hooks/useFinanceSummary'
+import { useExpenses } from './hooks/useExpenses'
 import './App.css'
 import './styles/dialog.css'
 import './styles/budget.css'
@@ -35,6 +38,12 @@ function App() {
   const [budgetEditor, setBudgetEditor] = useState({ open: false, owner: 0 })
   const budgetOwnerRef = useRef(0)
   const budgetSavingRef = useRef(false)
+  const addExpenseRef = useRef(null)
+  const expenseOwnerRef = useRef(0)
+  const expenseSavingRef = useRef(false)
+  const [expenseEditor, setExpenseEditor] = useState({ open: false, expense: null, owner: 0, saving: false })
+  const [expenseConfirmOpen, setExpenseConfirmOpen] = useState(false)
+  const expenses = useExpenses({ year: today.getFullYear(), month: today.getMonth() + 1, onMutated: finances.refresh })
 
   useEffect(() => {
     mountedRef.current = true
@@ -145,6 +154,43 @@ function App() {
     setBudgetEditor((current) => current.owner === owner ? { ...current, saving } : current)
   }
 
+  function openExpenseEditor(expense = null) {
+    const owner = expenseOwnerRef.current + 1
+    expenseOwnerRef.current = owner
+    expenseSavingRef.current = false
+    setExpenseConfirmOpen(false)
+    setExpenseEditor({ open: true, expense, owner, saving: false })
+  }
+
+  function closeExpenseEditor(expectedOwner, force = false) {
+    if (typeof expectedOwner === 'number' && expenseOwnerRef.current !== expectedOwner) return
+    if (expenseSavingRef.current && !force) return
+    expenseOwnerRef.current += 1
+    expenseSavingRef.current = false
+    setExpenseConfirmOpen(false)
+    setExpenseEditor({ open: false, expense: null, owner: expenseOwnerRef.current, saving: false })
+  }
+
+  function setExpenseSaving(owner, saving) {
+    if (expenseOwnerRef.current !== owner) return
+    expenseSavingRef.current = saving
+    setExpenseEditor((current) => current.owner === owner ? { ...current, saving } : current)
+  }
+
+  async function saveExpense(payload) {
+    if (expenseEditor.expense) return expenses.update(expenseEditor.expense.id, payload)
+    return expenses.create(payload)
+  }
+
+  async function deleteSelectedExpense() {
+    const owner = expenseEditor.owner
+    await expenses.remove(expenseEditor.expense.id)
+    if (expenseOwnerRef.current === owner) {
+      setAnnouncement('Expense deleted.')
+      closeExpenseEditor(owner, true)
+    }
+  }
+
   return (
     <div className="dashboard-shell" id="dashboard">
       <div className="dashboard-layout">
@@ -168,9 +214,11 @@ function App() {
             status={finances.status}
             error={finances.error}
             onRetry={finances.refresh}
-            onAddExpense={() => setAnnouncement('Expense entry is coming next.')}
+            onAddExpense={() => openExpenseEditor()}
             onEditBudget={openBudgetEditor}
+            addExpenseRef={addExpenseRef}
           />
+          <ExpenseList expenses={expenses.expenses} status={expenses.status} error={expenses.error} onRetry={expenses.retry} onSelect={openExpenseEditor} />
           <p className="sr-only" role="status">{announcement}</p>
         </main>
       </div>
@@ -189,6 +237,41 @@ function App() {
           onSubmit={saveAssignment}
         />
       </Dialog>
+
+      <Dialog
+        active={!expenseConfirmOpen}
+        dismissible={!expenseEditor.saving}
+        fallbackFocusRef={addExpenseRef}
+        open={expenseEditor.open}
+        title={expenseEditor.expense ? 'Edit expense' : 'New expense'}
+        onClose={() => closeExpenseEditor()}
+      >
+        <ExpenseForm
+          key={expenseEditor.owner}
+          initialExpense={expenseEditor.expense}
+          onCancel={() => closeExpenseEditor()}
+          onSubmit={saveExpense}
+          onSavingChange={(saving) => setExpenseSaving(expenseEditor.owner, saving)}
+          onSaved={() => {
+            const owner = expenseEditor.owner
+            setAnnouncement(expenseEditor.expense ? 'Expense updated.' : 'Expense created.')
+            closeExpenseEditor(owner, true)
+          }}
+        />
+        {expenseEditor.expense && <button className="expense-delete-button danger-button" type="button" onClick={() => setExpenseConfirmOpen(true)} disabled={expenseEditor.saving}>Delete expense</button>}
+      </Dialog>
+
+      <ConfirmDialog
+        key={`expense-${expenseEditor.owner}`}
+        open={expenseConfirmOpen}
+        title="Delete expense?"
+        message="This expense will be permanently deleted."
+        confirmLabel="Delete expense"
+        errorMessage="Could not delete the expense. Try again."
+        fallbackFocusRef={addExpenseRef}
+        onCancel={() => setExpenseConfirmOpen(false)}
+        onConfirm={deleteSelectedExpense}
+      />
 
       <ConfirmDialog
         key={editor.owner}
