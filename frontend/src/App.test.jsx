@@ -90,6 +90,31 @@ describe('App', () => {
     expect(getFinanceSummary).toHaveBeenCalledTimes(2)
   })
 
+  it('closes after a successful expense write when only the summary refresh fails', async () => {
+    const user = userEvent.setup()
+    listTasks.mockResolvedValue([])
+    getFinanceSummary
+      .mockResolvedValueOnce({
+        year: 2026, month: 9, budgetAmount: 600, totalSpent: 0,
+        remaining: 600, isOverBudget: false, hasBudget: true, categories: [],
+      })
+      .mockRejectedValueOnce(new Error('Summary refresh unavailable'))
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Add expense' }))
+    const dialog = screen.getByRole('dialog', { name: 'New expense' })
+    await user.type(within(dialog).getByLabelText('Title'), 'Lunch')
+    await user.type(within(dialog).getByLabelText('Amount'), '14.50')
+    await user.selectOptions(within(dialog).getByLabelText('Category'), 'Food')
+    await user.click(within(dialog).getByRole('button', { name: 'Save expense' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New expense' })).not.toBeInTheDocument())
+    expect(createExpense).toHaveBeenCalledOnce()
+    expect(await screen.findByText('Summary refresh unavailable')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Try again' })).toHaveLength(1)
+    expect(screen.getByRole('status')).toHaveTextContent('Expense created.')
+    expect(screen.queryByText('Could not save the expense. Try again.')).not.toBeInTheDocument()
+  })
+
   it('keeps expense values and ownership while a save fails or resolves late', async () => {
     const user = userEvent.setup()
     const pending = deferred()

@@ -35,6 +35,36 @@ describe('useExpenses', () => {
     expect(onMutated).toHaveBeenCalledTimes(3)
   })
 
+  it('resolves a successful write when the expense-list refresh fails', async () => {
+    const onMutated = vi.fn().mockResolvedValue(undefined)
+    listExpenses.mockResolvedValueOnce([]).mockRejectedValueOnce(new Error('list offline'))
+    createExpense.mockResolvedValue({ id: 7 })
+    const { result } = renderHook(() => useExpenses({ year: 2026, month: 9, onMutated }))
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    let saved
+    await act(async () => { saved = await result.current.create({ title: 'Lunch' }) })
+
+    expect(saved).toEqual({ id: 7 })
+    expect(result.current.status).toBe('error')
+    expect(onMutated).toHaveBeenCalledOnce()
+  })
+
+  it('resolves a successful write when the finance-summary refresh fails', async () => {
+    const onMutated = vi.fn().mockRejectedValue(new Error('summary offline'))
+    listExpenses.mockResolvedValue([])
+    createExpense.mockResolvedValue({ id: 8 })
+    const { result } = renderHook(() => useExpenses({ year: 2026, month: 9, onMutated }))
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    let saved
+    await act(async () => { saved = await result.current.create({ title: 'Book' }) })
+
+    expect(saved).toEqual({ id: 8 })
+    expect(result.current.status).toBe('ready')
+    expect(listExpenses).toHaveBeenCalledTimes(2)
+  })
+
   it('aborts and ignores stale loads when the month changes or the hook unmounts', async () => {
     const stale = deferred(); const current = deferred(); const pending = deferred()
     listExpenses.mockReturnValueOnce(stale.promise).mockReturnValueOnce(current.promise).mockReturnValueOnce(pending.promise)

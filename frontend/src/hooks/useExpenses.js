@@ -51,7 +51,12 @@ export function useExpenses({ year, month, onMutated }) {
     mutationControllersRef.current.add(controller)
     try {
       const result = await operation(controller.signal)
-      if (mountedRef.current && !controller.signal.aborted) await Promise.all([load(false), onMutated?.()])
+      if (mountedRef.current && !controller.signal.aborted) {
+        await Promise.allSettled([
+          load(false),
+          Promise.resolve().then(() => onMutated?.()),
+        ])
+      }
       return result
     } finally {
       mutationControllersRef.current.delete(controller)
