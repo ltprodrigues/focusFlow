@@ -47,7 +47,7 @@ export function useFinanceSummary({ year, month }) {
     saveRef.current = controller
     try {
       const saved = await putBudget(year, month, amount, { signal: controller.signal })
-      if (!controller.signal.aborted && mountedRef.current) await refresh()
+      if (!controller.signal.aborted && mountedRef.current) await refresh().catch(() => {})
       return saved
     } finally {
       if (saveRef.current === controller) saveRef.current = null

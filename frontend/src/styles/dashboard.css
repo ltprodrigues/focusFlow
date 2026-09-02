@@ -27,3 +27,8 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--gold); outline-
   .header-actions { flex-shrink: 0; }
   .notification-button { display: none; }
 }
+@media (max-width: 520px) {
+  .dashboard-header { align-items: stretch; flex-direction: column; }
+  .header-actions { flex-wrap: wrap; width: 100%; }
+  .add-assignment-button { max-width: 100%; width: 100%; }
+}

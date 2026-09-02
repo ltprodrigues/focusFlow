@@ -310,6 +310,25 @@ describe('App', () => {
     expect(screen.queryByRole('dialog', { name: 'New assignment' })).not.toBeInTheDocument()
   })
 
+  it('closes and announces a successful assignment create when its list refresh fails', async () => {
+    const user = userEvent.setup()
+    listTasks.mockResolvedValueOnce([]).mockRejectedValueOnce(new Error('list refresh failed'))
+    createTask.mockResolvedValue({ id: 8 })
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /Add assignment/ }))
+    await user.type(screen.getByLabelText('Title'), 'Research essay')
+    await user.type(screen.getByLabelText('Course'), 'English')
+    await user.type(screen.getByLabelText('Due date and time'), '2026-09-02T14:30')
+    await user.click(screen.getByRole('button', { name: 'Save assignment' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New assignment' })).not.toBeInTheDocument())
+    expect(screen.getByRole('status')).toHaveTextContent('Assignment created.')
+    expect(await screen.findByText('Assignments could not load.')).toBeInTheDocument()
+    expect(screen.queryByText('Could not save the assignment. Try again.')).not.toBeInTheDocument()
+    expect(createTask).toHaveBeenCalledOnce()
+  })
+
   it('opens a selected card in edit mode and persists completion', async () => {
     const user = userEvent.setup()
     const task = currentWeekTask('Research essay')
@@ -348,6 +367,24 @@ describe('App', () => {
     expect(screen.queryByRole('dialog', { name: 'Edit assignment' })).not.toBeInTheDocument()
   })
 
+  it('closes and announces a successful delete when its deadline refresh fails', async () => {
+    const user = userEvent.setup()
+    const task = currentWeekTask('Research essay')
+    listTasks.mockResolvedValueOnce([task]).mockResolvedValueOnce([])
+    listNextTasks.mockResolvedValueOnce([task]).mockRejectedValueOnce(new Error('deadline refresh failed'))
+    deleteTask.mockResolvedValue(null)
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: /Research essay/ }))
+    await user.click(screen.getByRole('button', { name: 'Delete assignment' }))
+    await user.click(within(screen.getByRole('dialog', { name: 'Delete assignment?' })).getByRole('button', { name: 'Delete assignment' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByRole('status')).toHaveTextContent('Assignment deleted.')
+    expect(deleteTask).toHaveBeenCalledOnce()
+    expect(listNextTasks).toHaveBeenCalledTimes(2)
+  })
+
   it('cancels editing without mutating the assignment', async () => {
     const user = userEvent.setup()
     const task = currentWeekTask('Research essay')
@@ -381,25 +418,28 @@ describe('App', () => {
     expect(screen.getByDisplayValue('Research essay')).toBeInTheDocument()
   })
 
-  it('does not let assignment A finishing late close assignment B', async () => {
+  it('locks every assignment dismissal while saving, then closes and announces once', async () => {
     const user = userEvent.setup()
     const firstTask = currentWeekTask('Assignment A')
-    const secondTask = currentWeekTask('Assignment B', 1)
     const mutation = deferred()
-    listTasks.mockResolvedValueOnce([firstTask, secondTask]).mockResolvedValueOnce([firstTask, secondTask])
+    listTasks.mockResolvedValueOnce([firstTask]).mockResolvedValueOnce([firstTask])
     updateTask.mockReturnValue(mutation.promise)
     render(<App />)
 
     await user.click(await screen.findByRole('button', { name: /Assignment A/ }))
+    const dialog = screen.getByRole('dialog', { name: 'Edit assignment' })
     await user.click(screen.getByRole('button', { name: 'Save assignment' }))
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled()
-    await user.click(screen.getByRole('button', { name: 'Cancel' }))
-    await user.click(screen.getByRole('button', { name: /Assignment B/ }))
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeDisabled()
+    expect(within(dialog).getByRole('button', { name: 'Delete assignment' })).toBeDisabled()
+    expect(within(dialog).getByRole('button', { name: 'Close edit assignment' })).toBeDisabled()
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('dialog', { name: 'Edit assignment' })).toBeInTheDocument()
+    await user.click(dialog.closest('.dialog-backdrop'))
+    expect(screen.getByRole('dialog', { name: 'Edit assignment' })).toBeInTheDocument()
 
     await act(async () => mutation.resolve(null))
-    await waitFor(() => expect(listTasks).toHaveBeenCalledTimes(2))
-    expect(screen.getByRole('dialog', { name: 'Edit assignment' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Title')).toHaveValue('Assignment B')
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Edit assignment' })).not.toBeInTheDocument())
+    expect(screen.getByRole('status')).toHaveTextContent('Assignment updated.')
   })
 
   it('retains rejected delete confirmation and supports retry', async () => {
@@ -536,6 +576,30 @@ describe('App', () => {
 
     await act(async () => save.resolve({ amount: 600 }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Monthly budget' })).not.toBeInTheDocument())
+  })
+
+  it('closes and announces a successful budget save while showing its refresh error', async () => {
+    const user = userEvent.setup()
+    listTasks.mockResolvedValue([])
+    getFinanceSummary
+      .mockResolvedValueOnce({
+        year: 2026, month: 9, budgetAmount: 0, totalSpent: 42, remaining: -42,
+        isOverBudget: true, hasBudget: false, categories: [{ category: 'Food', amount: 42 }],
+      })
+      .mockRejectedValueOnce(new Error('Budget refresh unavailable'))
+    putBudget.mockResolvedValue({ amount: 600 })
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: 'Set monthly budget' }))
+    const dialog = screen.getByRole('dialog', { name: 'Monthly budget' })
+    await user.type(within(dialog).getByLabelText('Monthly budget'), '600')
+    await user.click(within(dialog).getByRole('button', { name: 'Save budget' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Monthly budget' })).not.toBeInTheDocument())
+    expect(screen.getByRole('status')).toHaveTextContent('Monthly budget saved.')
+    expect(await screen.findByText('Budget refresh unavailable')).toBeInTheDocument()
+    expect(screen.queryByText('Could not save the budget. Try again.')).not.toBeInTheDocument()
+    expect(putBudget).toHaveBeenCalledOnce()
   })
 
   it('reinitializes an unsaved budget value when the dialog is reopened', async () => {

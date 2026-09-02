@@ -22,3 +22,11 @@
   .planner-title-row { align-items: flex-start; gap: 10px; }
   .next-deadline { align-items: flex-start; gap: 8px; }
 }
+@media (max-width: 520px) {
+  .planner-card { min-width: 0; padding: 14px; }
+  .planner-title-row { align-items: flex-start; flex-wrap: wrap; }
+  .week-controls { max-width: 100%; }
+  .next-deadline { flex-wrap: wrap; }
+  .next-deadline button { max-width: 100%; white-space: normal; }
+  .planner-scroll { max-width: 100%; overflow-x: auto; }
+}

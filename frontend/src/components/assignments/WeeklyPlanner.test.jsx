@@ -99,4 +99,13 @@ describe('WeeklyPlanner', () => {
     await user.click(screen.getByRole('button', { name: 'Try again' }))
     expect(retry).toHaveBeenCalledOnce()
   })
+
+  it('keeps only the weekday grid inside the horizontal scroll region', () => {
+    const { container } = render(<WeeklyPlanner days={weekDays} tasks={[]} />)
+    const scrollRegion = container.querySelector('.planner-scroll')
+
+    expect(scrollRegion).toContainElement(container.querySelector('.week-grid'))
+    expect(scrollRegion).not.toContainElement(container.querySelector('.planner-title-row'))
+    expect(scrollRegion).not.toContainElement(container.querySelector('.next-deadline'))
+  })
 })

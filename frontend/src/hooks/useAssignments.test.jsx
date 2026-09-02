@@ -84,6 +84,41 @@ describe('useAssignments', () => {
     expect(result.current.tasks).toEqual([{ id: 7, title: 'Refreshed' }])
   })
 
+  it.each([
+    ['create', createTask, { title: 'Research essay' }],
+    ['update', updateTask, 8, { title: 'Research essay' }],
+    ['remove', deleteTask, 8],
+  ])('resolves a successful %s when the active-section refresh fails', async (method, apiCall, ...args) => {
+    const onMutated = vi.fn().mockResolvedValue(undefined)
+    listTasks.mockResolvedValueOnce([]).mockRejectedValueOnce(new Error('list refresh failed'))
+    apiCall.mockResolvedValue({ id: 8 })
+    const { result } = renderHook(() => useAssignments({ ...firstRange, onMutated }))
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    await expect(act(async () => result.current[method](...args))).resolves.toMatchObject({ id: 8 })
+
+    await waitFor(() => expect(result.current.status).toBe('error'))
+    expect(result.current.error).toBe('Assignments could not load.')
+    expect(onMutated).toHaveBeenCalledOnce()
+  })
+
+  it.each([
+    ['create', createTask, { title: 'Research essay' }],
+    ['update', updateTask, 8, { title: 'Research essay' }],
+    ['remove', deleteTask, 8],
+  ])('resolves a successful %s when the deadline refresh fails', async (method, apiCall, ...args) => {
+    const onMutated = vi.fn().mockRejectedValue(new Error('deadline refresh failed'))
+    listTasks.mockResolvedValueOnce([]).mockResolvedValueOnce([{ id: 8, title: 'Refreshed' }])
+    apiCall.mockResolvedValue({ id: 8 })
+    const { result } = renderHook(() => useAssignments({ ...firstRange, onMutated }))
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    await expect(act(async () => result.current[method](...args))).resolves.toMatchObject({ id: 8 })
+
+    expect(result.current.tasks).toEqual([{ id: 8, title: 'Refreshed' }])
+    expect(onMutated).toHaveBeenCalledOnce()
+  })
+
   it('rejects a failed mutation without refreshing the section', async () => {
     listTasks.mockResolvedValue([])
     createTask.mockRejectedValue(new Error('offline'))

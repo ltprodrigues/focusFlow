@@ -56,15 +56,16 @@ it('aborts a pending budget save on unmount', async () => {
   expect(signal.aborted).toBe(true)
 })
 
-it('surfaces a finance refresh failure after the budget write succeeds', async () => {
+it('resolves a successful budget write while surfacing its failed summary refresh', async () => {
   getFinanceSummary.mockResolvedValueOnce({ month: 8, budgetAmount: 600 }).mockRejectedValueOnce(new Error('refresh failed'))
   putBudget.mockResolvedValue({ amount: 700 })
   const { result } = renderHook(() => useFinanceSummary({ year: 2026, month: 8 }))
   await waitFor(() => expect(result.current.status).toBe('success'))
-  let requestError
+  let saved
   await act(async () => {
-    try { await result.current.saveBudget(700) } catch (error) { requestError = error }
+    saved = await result.current.saveBudget(700)
   })
-  expect(requestError).toMatchObject({ message: 'refresh failed' })
+  expect(saved).toEqual({ amount: 700 })
   await waitFor(() => expect(result.current.status).toBe('error'))
+  expect(result.current.error).toMatchObject({ message: 'refresh failed' })
 })

@@ -78,20 +78,22 @@ export function useAssignments({ start, end, onMutated }) {
     return load(active.range, active.rangeKey)
   }, [load])
 
-  const create = useCallback(async (input) => {
-    await createTask(input)
-    if (mountedRef.current) await Promise.all([refresh(), onMutated?.()])
+  const mutate = useCallback(async (operation) => {
+    const saved = await operation()
+    if (mountedRef.current) {
+      await Promise.allSettled([
+        refresh(),
+        Promise.resolve().then(() => onMutated?.()),
+      ])
+    }
+    return saved
   }, [onMutated, refresh])
 
-  const update = useCallback(async (id, input) => {
-    await updateTask(id, input)
-    if (mountedRef.current) await Promise.all([refresh(), onMutated?.()])
-  }, [onMutated, refresh])
+  const create = useCallback((input) => mutate(() => createTask(input)), [mutate])
 
-  const remove = useCallback(async (id) => {
-    await deleteTask(id)
-    if (mountedRef.current) await Promise.all([refresh(), onMutated?.()])
-  }, [onMutated, refresh])
+  const update = useCallback((id, input) => mutate(() => updateTask(id, input)), [mutate])
+
+  const remove = useCallback((id) => mutate(() => deleteTask(id)), [mutate])
 
   const retry = useCallback(() => {
     const active = activeRangeRef.current

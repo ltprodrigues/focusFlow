@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 function toLocalDateTime(value) {
   if (!value) return ''
@@ -18,11 +18,18 @@ function initialValues(task) {
   }
 }
 
-export function AssignmentForm({ initialTask, onSubmit, onDelete, onCancel }) {
+export function AssignmentForm({ initialTask, onSubmit, onDelete, onCancel, onSavingChange }) {
+  const mountedRef = useRef(false)
+  const savingRef = useRef(false)
   const [values, setValues] = useState(() => initialValues(initialTask))
   const [errors, setErrors] = useState({})
   const [submitError, setSubmitError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   function updateValue(event) {
     const { checked, name, type, value } = event.target
@@ -32,6 +39,7 @@ export function AssignmentForm({ initialTask, onSubmit, onDelete, onCancel }) {
 
   async function handleSubmit(event) {
     event.preventDefault()
+    if (savingRef.current) return
     const nextErrors = {
       title: values.title.trim() ? undefined : 'Title is required',
       course: values.course.trim() ? undefined : 'Course is required',
@@ -40,7 +48,9 @@ export function AssignmentForm({ initialTask, onSubmit, onDelete, onCancel }) {
     setErrors(nextErrors)
     if (Object.values(nextErrors).some(Boolean)) return
 
+    savingRef.current = true
     setIsSaving(true)
+    onSavingChange?.(true)
     setSubmitError('')
     try {
       await onSubmit({
@@ -52,9 +62,13 @@ export function AssignmentForm({ initialTask, onSubmit, onDelete, onCancel }) {
         notes: values.notes.trim() || null,
       })
     } catch {
-      setSubmitError('Could not save the assignment. Try again.')
+      if (mountedRef.current) setSubmitError('Could not save the assignment. Try again.')
     } finally {
-      setIsSaving(false)
+      savingRef.current = false
+      if (mountedRef.current) {
+        setIsSaving(false)
+        onSavingChange?.(false)
+      }
     }
   }
 
@@ -71,8 +85,8 @@ export function AssignmentForm({ initialTask, onSubmit, onDelete, onCancel }) {
       {initialTask && <label className="checkbox-field"><input name="isCompleted" type="checkbox" checked={values.isCompleted} onChange={updateValue} />Completed</label>}
       {submitError && <p className="form-error" role="alert">{submitError}</p>}
       <div className="form-actions">
-        {initialTask && onDelete && <button className="danger-button" type="button" onClick={onDelete}>Delete assignment</button>}
-        <button type="button" onClick={onCancel}>Cancel</button>
+        {initialTask && onDelete && <button className="danger-button" type="button" onClick={onDelete} disabled={isSaving}>Delete assignment</button>}
+        <button type="button" onClick={onCancel} disabled={isSaving}>Cancel</button>
         <button type="submit" disabled={isSaving}>{isSaving ? 'Saving…' : 'Save assignment'}</button>
       </div>
     </form>

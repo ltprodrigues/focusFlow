@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AssignmentForm } from './AssignmentForm'
@@ -34,5 +34,21 @@ describe('AssignmentForm', () => {
 
     expect(await screen.findByDisplayValue('Research essay')).toBeInTheDocument()
     expect(screen.getByText('Could not save the assignment. Try again.')).toBeInTheDocument()
+  })
+
+  it('reports pending ownership and disables every destructive dismissal action', async () => {
+    let finish
+    const pending = new Promise((resolve) => { finish = resolve })
+    const savingChange = vi.fn()
+    render(<AssignmentForm initialTask={{ title: 'Essay', course: 'English', dueDate: '2026-09-02T14:30:00Z', priority: 'High', isCompleted: false }} onSubmit={() => pending} onDelete={vi.fn()} onCancel={vi.fn()} onSavingChange={savingChange} />)
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: 'Save assignment' }))
+
+    expect(savingChange).toHaveBeenCalledWith(true)
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Delete assignment' })).toBeDisabled()
+    await act(async () => finish())
+    expect(savingChange).toHaveBeenLastCalledWith(false)
   })
 })

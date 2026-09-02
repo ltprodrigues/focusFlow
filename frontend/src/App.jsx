@@ -40,11 +40,12 @@ export class DashboardErrorBoundary extends Component {
 
 function FocusFlowDashboard() {
   const [weekDate, setWeekDate] = useState(() => new Date())
-  const [editor, setEditor] = useState({ open: false, task: null, owner: 0 })
+  const [editor, setEditor] = useState({ open: false, task: null, owner: 0, saving: false })
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [allAssignments, setAllAssignments] = useState({ open: false, tasks: [], status: 'idle' })
   const addAssignmentRef = useRef(null)
   const editorOwnerRef = useRef(0)
+  const editorSavingRef = useRef(false)
   const mountedRef = useRef(false)
   const allRequestRef = useRef({ controller: null, id: 0 })
   const week = useMemo(() => getWeekRange(weekDate), [weekDate])
@@ -88,27 +89,38 @@ function FocusFlowDashboard() {
   function openEditor(task) {
     const owner = editorOwnerRef.current + 1
     editorOwnerRef.current = owner
+    editorSavingRef.current = false
     setConfirmOpen(false)
-    setEditor({ open: true, task, owner })
+    setEditor({ open: true, task, owner, saving: false })
   }
 
-  function closeEditor(expectedOwner) {
+  function closeEditor(expectedOwner, force = false) {
     if (typeof expectedOwner === 'number' && editorOwnerRef.current !== expectedOwner) return
+    if (editorSavingRef.current && !force) return
     editorOwnerRef.current += 1
+    editorSavingRef.current = false
     setConfirmOpen(false)
-    setEditor({ open: false, task: null, owner: editorOwnerRef.current })
+    setEditor({ open: false, task: null, owner: editorOwnerRef.current, saving: false })
+  }
+
+  function setEditorSaving(owner, saving) {
+    if (editorOwnerRef.current !== owner) return
+    editorSavingRef.current = saving
+    setEditor((current) => current.owner === owner ? { ...current, saving } : current)
   }
 
   async function saveAssignment(payload) {
     const owner = editor.owner
+    const wasEditing = Boolean(editor.task)
     if (editor.task) {
       await assignments.update(editor.task.id, payload)
-      announce('Assignment updated.')
     } else {
       await assignments.create(payload)
-      announce('Assignment created.')
     }
-    closeEditor(owner)
+    if (mountedRef.current && editorOwnerRef.current === owner) {
+      announce(wasEditing ? 'Assignment updated.' : 'Assignment created.')
+      closeEditor(owner, true)
+    }
   }
 
   async function deleteAssignment() {
@@ -247,6 +259,7 @@ function FocusFlowDashboard() {
 
       <Dialog
         active={!confirmOpen}
+        dismissible={!editor.saving}
         fallbackFocusRef={addAssignmentRef}
         open={editor.open}
         title={editor.task ? 'Edit assignment' : 'New assignment'}
@@ -257,6 +270,7 @@ function FocusFlowDashboard() {
           onCancel={() => closeEditor()}
           onDelete={editor.task ? () => setConfirmOpen(true) : undefined}
           onSubmit={saveAssignment}
+          onSavingChange={(saving) => setEditorSaving(editor.owner, saving)}
         />
       </Dialog>
 
