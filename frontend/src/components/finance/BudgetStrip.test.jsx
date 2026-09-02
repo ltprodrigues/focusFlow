@@ -24,6 +24,7 @@ const summary = {
 
 it('shows the monthly calculation, four category totals, and add action', () => {
   render(<BudgetStrip summary={summary} status="success" onAddExpense={vi.fn()} />)
+  expect(screen.getByRole('img', { name: '57% of budget used' })).toBeInTheDocument()
   expect(screen.getByRole('heading', { name: 'August budget' })).toBeInTheDocument()
   expect(screen.getByText('$258.00')).toBeInTheDocument()
   expect(screen.getByText('Food')).toBeInTheDocument()
@@ -42,7 +43,7 @@ it('keeps spending details and expense entry available before a budget is set', 
   const onEditBudget = vi.fn()
   render(<BudgetStrip summary={{ ...summary, hasBudget: false, budgetAmount: 0, remaining: -342, isOverBudget: true }} status="success" onAddExpense={vi.fn()} onEditBudget={onEditBudget} />)
   expect(screen.getByText('$342.00')).toBeInTheDocument()
-  expect(screen.getByLabelText('Monthly budget not set; $342.00 spent')).toBeInTheDocument()
+  expect(screen.getByRole('img', { name: 'Monthly budget not set; $342.00 spent' })).toBeInTheDocument()
   expect(screen.getByText('Food')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Add expense' })).toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'Set monthly budget' }))

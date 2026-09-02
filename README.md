@@ -14,6 +14,14 @@ FocusFlow helps students organize assignments, deadlines, and personal expenses 
 
 Create a local PostgreSQL database for FocusFlow. Set the `ConnectionStrings__DefaultConnection` environment variable to a PostgreSQL connection string for that database. Keep local credentials in environment variables or user secrets; do not commit them.
 
+For example, set it only in the current PowerShell session before starting the API:
+
+```powershell
+$env:ConnectionStrings__DefaultConnection = "Host=localhost;Port=5432;Database=focusflow;Username=YOUR_USER;Password=YOUR_PASSWORD"
+```
+
+If a real credential was previously stored in a tracked configuration file, rotate that database password; removing it from the current file does not remove it from Git history.
+
 Apply the migrations from the repository root:
 
 ```powershell
@@ -26,7 +34,7 @@ dotnet ef database update --project backend
 dotnet run --project backend --launch-profile http
 ```
 
-The development API runs at `http://localhost:5062`. On startup it applies pending migrations and idempotently prepares demo user ID `1`. The demo includes two assignments, a CAD 650 current-month budget, and representative Food, Transport, School, and Other expenses. Existing demo rows are preserved and missing demo rows are added without duplicating data. This development-only identity scopes assignments, budgets, and expenses until account authentication is added.
+The development API runs at `http://localhost:5062`. On startup it applies pending migrations and idempotently prepares demo user ID `1`. The demo month follows the configured `America/Toronto` student calendar. The demo includes two assignments, a CAD 650 current-month budget, and representative Food, Transport, School, and Other expenses. Existing demo rows are preserved and missing demo rows are added without duplicating data. This development-only identity scopes assignments, budgets, and expenses until account authentication is added.
 
 ### 3. Start the frontend
 

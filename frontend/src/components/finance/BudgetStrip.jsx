@@ -26,7 +26,7 @@ export function BudgetStrip({ summary, status, error, onRetry, onAddExpense, onE
   return (
     <section className={`budget-strip${summary.isOverBudget && summary.hasBudget ? ' is-over-budget' : ''}${summary.hasBudget ? '' : ' budget-no-budget'}`} aria-labelledby="budget-title">
       <div className="budget-chart-group">
-        <div className="budget-donut" aria-label={donutLabel} style={{ '--budget-chart': buildConicGradient(summary.categories, summary.totalSpent) }}>
+        <div className="budget-donut" role="img" aria-label={donutLabel} style={{ '--budget-chart': buildConicGradient(summary.categories, summary.totalSpent) }}>
           <span>{used}%</span>
         </div>
         <div><p className="budget-eyebrow">Monthly spending</p><h2 id="budget-title">{month} budget</h2><button className="budget-edit" type="button" onClick={onEditBudget}>{summary.hasBudget ? 'Edit budget' : 'Set monthly budget'}</button></div>

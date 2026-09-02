@@ -1,6 +1,7 @@
 using backend.Data;
 using backend.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 public class DevelopmentDataSeederTests
 {
@@ -62,5 +63,31 @@ public class DevelopmentDataSeederTests
 
         Assert.Equal(4, await db.Expenses.CountAsync(expense => expense.UserId == 1));
         Assert.Single(db.Expenses.Where(expense => expense.UserId == 1 && expense.Title == "Campus lunch"));
+    }
+
+    [Fact]
+    public async Task SeedAsync_UsesTorontoCalendarMonthAtUtcBoundary()
+    {
+        await using var db = TestDbContextFactory.Create();
+        var utcBoundary = new DateTimeOffset(2026, 9, 1, 2, 0, 0, TimeSpan.Zero);
+
+        await DevelopmentDataSeeder.SeedAsync(db, 1, utcBoundary, "America/Toronto");
+        await DevelopmentDataSeeder.SeedAsync(db, 1, utcBoundary, "America/Toronto");
+
+        var budget = Assert.Single(await db.MonthlyBudgets.ToListAsync());
+        Assert.Equal(2026, budget.Year);
+        Assert.Equal(8, budget.Month);
+        Assert.Equal(4, await db.Expenses.CountAsync(expense => expense.Date >= new DateTime(2026, 8, 1, 4, 0, 0, DateTimeKind.Utc)
+            && expense.Date < new DateTime(2026, 9, 1, 4, 0, 0, DateTimeKind.Utc)));
+    }
+
+    [Fact]
+    public void AppSettings_DoesNotContainDatabasePassword()
+    {
+        var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../backend/appsettings.json"));
+        using var document = JsonDocument.Parse(File.ReadAllText(path));
+        var connection = document.RootElement.GetProperty("ConnectionStrings").GetProperty("DefaultConnection").GetString();
+
+        Assert.True(string.IsNullOrWhiteSpace(connection));
     }
 }

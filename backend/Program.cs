@@ -37,7 +37,8 @@ if (app.Environment.IsDevelopment())
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     await db.Database.MigrateAsync();
     var demoUserId = app.Configuration.GetValue<int>("DemoUser:Id");
-    await DevelopmentDataSeeder.SeedAsync(db, demoUserId);
+    var demoTimeZone = builder.Configuration["DemoUser:TimeZone"] ?? "America/Toronto";
+    await DevelopmentDataSeeder.SeedAsync(db, demoUserId, timeZoneId: demoTimeZone);
 
     app.UseSwagger();
     app.UseSwaggerUI();
