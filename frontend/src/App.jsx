@@ -9,6 +9,9 @@ import { ExpenseForm } from './components/finance/ExpenseForm'
 import { ExpenseList } from './components/finance/ExpenseList'
 import { DashboardHeader } from './components/layout/DashboardHeader'
 import { Sidebar } from './components/layout/Sidebar'
+import { LoginScreen } from './components/auth/LoginScreen'
+import { AuthLoadingScreen } from './components/auth/AuthLoadingScreen'
+import { useAuth } from './auth/AuthContext'
 import { ConfirmDialog } from './components/shared/ConfirmDialog'
 import { Dialog } from './components/shared/Dialog'
 import { useAssignments } from './hooks/useAssignments'
@@ -38,7 +41,7 @@ export class DashboardErrorBoundary extends Component {
   }
 }
 
-function FocusFlowDashboard() {
+function FocusFlowDashboard({ user, onLogout }) {
   const [weekDate, setWeekDate] = useState(() => new Date())
   const [editor, setEditor] = useState({ open: false, task: null, owner: 0, saving: false })
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -228,9 +231,9 @@ function FocusFlowDashboard() {
   return (
     <div className="dashboard-shell" id="dashboard">
       <div className="dashboard-layout">
-        <Sidebar />
+        <Sidebar user={user} />
         <main className="dashboard-main">
-          <DashboardHeader addButtonRef={addAssignmentRef} onAddAssignment={() => openEditor(null)} />
+          <DashboardHeader addButtonRef={addAssignmentRef} onAddAssignment={() => openEditor(null)} user={user} onLogout={onLogout} />
           <WeeklyPlanner
             days={week.days}
             error={assignments.status === 'error' ? assignments.error : undefined}
@@ -348,7 +351,11 @@ function FocusFlowDashboard() {
 }
 
 function App() {
-  return <DashboardErrorBoundary><FocusFlowDashboard /></DashboardErrorBoundary>
+  const auth = useAuth()
+  if (auth.status === 'loading') return <AuthLoadingScreen />
+  if (auth.status === 'anonymous') return <LoginScreen onLogin={() => auth.login('/')} />
+  if (auth.status === 'error') return <LoginScreen error onLogin={() => auth.login('/')} onRetry={auth.retry} />
+  return <DashboardErrorBoundary><FocusFlowDashboard user={auth.user} onLogout={auth.logout} /></DashboardErrorBoundary>
 }
 
 export default App

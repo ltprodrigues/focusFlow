@@ -6,6 +6,9 @@ import { getFinanceSummary, putBudget } from './api/finance'
 import { createExpense, deleteExpense, listExpenses, updateExpense } from './api/expenses'
 import { createTask, deleteTask, listNextTasks, listTasks, updateTask } from './api/tasks'
 import { getWeekRange } from './utils/week'
+import { useAuth } from './auth/AuthContext'
+
+vi.mock('./auth/AuthContext', () => ({ useAuth: vi.fn() }))
 
 vi.mock('./api/tasks', () => ({
   createTask: vi.fn(),
@@ -54,6 +57,13 @@ afterEach(() => {
 })
 
 beforeEach(() => {
+  useAuth.mockReturnValue({
+    status: 'authenticated',
+    user: { id: 7, name: 'Maya Singh', email: 'maya@example.com', pictureUrl: null },
+    logout: vi.fn(),
+    login: vi.fn(),
+    retry: vi.fn(),
+  })
   listNextTasks.mockResolvedValue([])
   getFinanceSummary.mockResolvedValue({
     year: 2026,
@@ -73,6 +83,39 @@ beforeEach(() => {
 })
 
 describe('App', () => {
+  it('shows Google login without mounting private dashboard requests', () => {
+    useAuth.mockReturnValue({ status: 'anonymous', login: vi.fn(), retry: vi.fn() })
+
+    render(<App />)
+
+    expect(screen.getByRole('button', { name: 'Sign in with Google' })).toBeInTheDocument()
+    expect(listTasks).not.toHaveBeenCalled()
+    expect(getFinanceSummary).not.toHaveBeenCalled()
+  })
+
+  it('shows a loading shell without mounting private dashboard requests', () => {
+    useAuth.mockReturnValue({ status: 'loading' })
+
+    render(<App />)
+
+    expect(screen.getByText('Checking your session…')).toBeInTheDocument()
+    expect(listTasks).not.toHaveBeenCalled()
+  })
+
+  it('shows the authenticated Google profile', async () => {
+    useAuth.mockReturnValue({
+      status: 'authenticated',
+      user: { id: 7, name: 'Maya Singh', email: 'maya@example.com', pictureUrl: 'https://example.test/maya.jpg' },
+      logout: vi.fn(), login: vi.fn(), retry: vi.fn(),
+    })
+    listTasks.mockResolvedValue([])
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Good morning, Maya' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Maya Singh' })).toHaveAttribute('src', 'https://example.test/maya.jpg')
+    expect(screen.getByRole('button', { name: 'Open profile menu' })).toBeInTheDocument()
+  })
+
   it('renders the complete planner and spending dashboard together', async () => {
     listTasks.mockResolvedValue([currentWeekTask('Research outline')])
     listNextTasks.mockResolvedValue([currentWeekTask('Research outline')])
