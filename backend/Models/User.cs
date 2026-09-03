@@ -14,5 +14,7 @@ public class User
 
     public List<Expense> Expenses { get; set; } = new();
 
+    public List<MonthlyBudget> MonthlyBudgets { get; set; } = new();
+
     public List<StudyTask> StudyTasks { get; set; } = new();
 }

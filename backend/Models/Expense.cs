@@ -12,6 +12,8 @@ public class Expense
 
     public DateTime Date { get; set; } = DateTime.UtcNow;
 
+    public string? Notes { get; set; }
+
     public int UserId { get; set; }
 
     public User User { get; set; } = null!;

@@ -1,0 +1,27 @@
+.dialog-backdrop { align-items: center; background: rgba(18, 37, 30, .56); display: flex; inset: 0; justify-content: center; padding: 20px; position: fixed; z-index: 20; }
+.dialog-panel { background: var(--surface); border-radius: 15px; box-shadow: 0 24px 60px rgba(15, 35, 27, .25); max-height: min(760px, calc(100svh - 40px)); max-width: 540px; overflow: auto; padding: 22px; width: 100%; }
+.dialog-header { align-items: center; display: flex; justify-content: space-between; margin-bottom: 18px; }
+.dialog-header h2 { font-size: 1.2rem; margin: 0; }
+.dialog-close { background: transparent; border: 0; border-radius: 7px; color: var(--muted); cursor: pointer; font-size: 1.5rem; line-height: 1; padding: 3px 7px; }
+.assignment-form { display: grid; gap: 6px; }
+.assignment-form label { color: var(--ink); display: grid; font-size: .76rem; font-weight: 700; gap: 5px; }
+.assignment-form input, .assignment-form select, .assignment-form textarea { background: #fbfcfa; border: 1px solid #d7dfda; border-radius: 8px; color: var(--ink); padding: 9px 10px; width: 100%; }
+.assignment-form textarea { min-height: 82px; resize: vertical; }
+.assignment-form .checkbox-field { align-items: center; display: flex; gap: 8px; margin-top: 5px; }
+.assignment-form .checkbox-field input { width: auto; }
+.field-error, .form-error { color: #a54531; font-size: .72rem; margin: -1px 0 4px; }
+.form-actions { align-items: center; display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+.form-actions button { background: #edf1ee; border: 0; border-radius: 8px; color: var(--forest); cursor: pointer; font: inherit; font-size: .76rem; font-weight: 700; padding: 9px 12px; }
+.form-actions button[type='submit'], .form-actions .danger-button { background: var(--forest); color: white; }
+.form-actions .danger-button { background: #a54531; margin-right: auto; }
+.form-actions button:disabled { cursor: wait; opacity: .6; }
+.confirm-dialog { max-width: 420px; }
+.confirm-dialog > p { color: var(--muted); font-size: .82rem; line-height: 1.5; }
+.all-assignments-dialog { max-width: 680px; }
+.all-assignments-list { display: grid; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.all-assignments-list button { align-items: center; background: #f8faf7; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); cursor: pointer; display: flex; justify-content: space-between; padding: 11px 12px; text-align: left; width: 100%; }
+.all-assignments-list button span { display: grid; gap: 3px; }
+.all-assignments-list button > span:last-child { color: var(--muted); font-size: .73rem; text-align: right; }
+.all-assignments-list small { color: var(--muted); }
+.dialog-status { color: var(--muted); font-size: .82rem; padding: 18px 0; text-align: center; }
+@media (max-width: 600px) { .dialog-backdrop { align-items: flex-end; padding: 0; } .dialog-panel { border-radius: 15px 15px 0 0; max-height: 92svh; } .all-assignments-list button { align-items: flex-start; gap: 10px; } }

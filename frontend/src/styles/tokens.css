@@ -1,0 +1,20 @@
+:root {
+  --forest: #1f4034;
+  --forest-light: #36594d;
+  --cream: #f4f6f2;
+  --gold: #e8bd69;
+  --ink: #24372f;
+  --muted: #75827d;
+  --line: #e1e8e3;
+  --surface: #fff;
+  --priority-high: #e59569;
+  --priority-medium: #7399d5;
+  --priority-low: #7aae79;
+  background: var(--cream);
+  color: var(--ink);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
