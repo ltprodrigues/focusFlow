@@ -19,6 +19,21 @@ public class ApplicationDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.Property(user => user.GoogleSubject).HasMaxLength(255);
+            entity.Property(user => user.Email).HasMaxLength(320);
+            entity.Property(user => user.Name).HasMaxLength(160);
+            entity.Property(user => user.PictureUrl).HasMaxLength(2048);
+            entity.Property(user => user.TimeZone)
+                .HasMaxLength(100)
+                .HasDefaultValue("America/Toronto");
+            entity.HasIndex(user => user.GoogleSubject)
+                .IsUnique()
+                .HasFilter("\"GoogleSubject\" IS NOT NULL");
+            entity.HasIndex(user => user.Email).IsUnique();
+        });
+
         modelBuilder.Entity<StudyTask>(entity =>
         {
             entity.Property(task => task.Priority)
