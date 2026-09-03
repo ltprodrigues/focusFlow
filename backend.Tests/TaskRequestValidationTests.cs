@@ -1,15 +1,17 @@
 using System.Net;
 using System.Net.Http.Json;
+using backend.DTOs;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 
-public sealed class TaskRequestValidationTests : IClassFixture<TaskApiFactory>
+public sealed class TaskRequestValidationTests : IClassFixture<AuthenticatedApiFactory>
 {
+    private readonly AuthenticatedApiFactory factory;
     private readonly HttpClient client;
-    public TaskRequestValidationTests(TaskApiFactory factory) => client = factory.CreateClient();
+    public TaskRequestValidationTests(AuthenticatedApiFactory factory)
+    {
+        this.factory = factory;
+        client = factory.CreateAuthenticatedClient(1);
+    }
 
     public static IEnumerable<object[]> InvalidBodies()
     {
@@ -25,24 +27,12 @@ public sealed class TaskRequestValidationTests : IClassFixture<TaskApiFactory>
     [MemberData(nameof(InvalidBodies))]
     public async Task Post_InvalidRequiredFields_ReturnsValidationProblem(object body)
     {
+        await factory.EnsureUserAsync(1, "validation@example.com");
+        var profile = await client.GetFromJsonAsync<CurrentUserDto>("/api/auth/me");
+        client.DefaultRequestHeaders.Add("X-FocusFlow-CSRF", profile!.AntiforgeryToken);
         var response = await client.PostAsJsonAsync("/api/tasks", body);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         Assert.NotNull(await response.Content.ReadFromJsonAsync<ValidationProblemDetails>());
-    }
-}
-
-public sealed class TaskApiFactory : WebApplicationFactory<Program>
-{
-    protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
-    {
-        builder.UseEnvironment("Testing");
-        builder.UseSetting("DemoUser:Id", "1");
-        builder.ConfigureServices(services =>
-        {
-            var descriptors = services.Where(d => d.ServiceType == typeof(DbContextOptions<backend.Data.ApplicationDbContext>)).ToList();
-            foreach (var descriptor in descriptors) services.Remove(descriptor);
-            services.AddDbContext<backend.Data.ApplicationDbContext>(options => options.UseInMemoryDatabase(Guid.NewGuid().ToString()));
-        });
     }
 }

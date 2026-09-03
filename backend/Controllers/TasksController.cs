@@ -4,11 +4,13 @@ using backend.Mappings;
 using backend.Models;
 using backend.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 namespace backend.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/tasks")]
 public sealed class TasksController(
     ApplicationDbContext db,

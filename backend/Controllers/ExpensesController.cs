@@ -3,11 +3,13 @@ using backend.DTOs;
 using backend.Models;
 using backend.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 namespace backend.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/expenses")]
 public sealed class ExpensesController(
     ApplicationDbContext db,

@@ -1,10 +1,12 @@
 using backend.DTOs;
 using backend.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace backend.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/finance")]
 public sealed class FinanceController(
     IFinanceSummaryService financeSummary,
