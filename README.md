@@ -33,29 +33,68 @@ dotnet ef database update --project backend
 ```powershell
 dotnet run --project backend --launch-profile http
 ```
+The goal of this project is to build a real-world productivity platform while applying fullstack development concepts including REST APIs, authentication, database management, and responsive UI design.
+
+## Tech Stack
+
+### Frontend
+- React (planned)
+
+### Backend
+- ASP.NET Core Web API
+- Entity Framework Core
+
+### Database
+- PostgreSQL
+
+### Tools
+- Git & GitHub
+- Rider
+- Swagger/OpenAPI
 
 The development API runs at `http://localhost:5062`. On startup it applies pending migrations and idempotently prepares demo user ID `1`. The demo month follows the configured `America/Toronto` student calendar. The demo includes two assignments, a CAD 650 current-month budget, and representative Food, Transport, School, and Other expenses. Existing demo rows are preserved and missing demo rows are added without duplicating data. This development-only identity scopes assignments, budgets, and expenses until account authentication is added.
 
-### 3. Start the frontend
+## Main Features
 
-In a second terminal:
+### Study Management
+- Create study tasks
+- Track deadlines
+- Mark tasks as completed
+- View upcoming responsibilities
 
-```powershell
-cd frontend
-Copy-Item .env.example .env
-npm install
-npm run dev
-```
+### Expense Management
+- Add expenses
+- Categorize spending
+- Track monthly expenses
+- View financial summaries
 
-Open the Vite URL shown in the terminal (normally `http://localhost:5173`). The development API permits that configured origin only; production does not enable this policy.
+### Dashboard
+- Study overview
+- Expense overview
+- Charts and analytics
 
-## Budget and expenses
+### User Management
+- User authentication (planned)
+- Personal user data
 
-Use **Edit budget** in the monthly spending strip to set the selected month's budget. Amounts are entered and displayed in Canadian dollars (CAD). Expenses support Food, Transport, School, Entertainment, Housing, and Other categories. **Add expense** creates a record; select a row under **This month's expenses** to edit or delete it. The budget remainder, donut, and category totals refresh after changes.
 
-## Verification
+## Current Progress
 
-Run backend tests and build from the repository root:
+### Completed
+- [x] Created project repository
+- [x] Set up ASP.NET Core Web API
+- [x] Configured project solution
+- [x] Connected PostgreSQL database
+- [x] Added Entity Framework Core
+- [x] Created database migrations
+- [x] Created backend models:
+  - User
+  - Expense
+  - StudyTask
+- [x] Created ApplicationDbContext
+- [x] Added Swagger documentation
+- [x] Created Expense API Controller
+- [x] Added DTO structure
 
 ```powershell
 dotnet test backend.Tests/backend.Tests.csproj
@@ -64,12 +103,20 @@ dotnet ef migrations list --project backend
 dotnet ef database update --project backend
 ```
 
-Run frontend checks from `frontend`:
+### In Progress
+- [ ] Complete Expense API testing
+- [ ] Create StudyTask API Controller
+- [ ] Add authentication system
 
-```powershell
-npm test
-npm run lint
-npm run build
-```
 
-For a persisted-data smoke test, start both applications, add an assignment and expense, refresh the browser, and confirm both remain. Then change the budget and verify the remainder and donut update; edit and delete the expense and verify the totals update. Check the browser console and API output for unhandled errors.
+### Upcoming
+- [ ] Build React frontend
+- [ ] Connect frontend with API
+- [ ] Create dashboard UI
+- [ ] Add charts and analytics
+- [ ] Deploy application
+
+
+## Project Status
+
+Currently in development.
