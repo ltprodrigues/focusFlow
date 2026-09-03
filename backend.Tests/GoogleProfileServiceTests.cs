@@ -1,6 +1,9 @@
 using backend.Auth;
+using backend.Data;
 using backend.Models;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 public sealed class GoogleProfileServiceTests
 {
@@ -78,5 +81,59 @@ public sealed class GoogleProfileServiceTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.UpsertAsync(
             new GoogleProfile("google-123", "student@example.com", "Student", null),
             "America/Toronto", cancellation.Token));
+    }
+
+    [Fact]
+    public async Task UpsertAsync_RecoversWhenAnotherCallbackCreatesTheSameGoogleSubject()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var plainOptions = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSqlite(connection).Options;
+        await using (var setup = new ApplicationDbContext(plainOptions))
+            await setup.Database.EnsureCreatedAsync();
+
+        var interceptor = new CompetingGoogleUserInterceptor(plainOptions);
+        var racingOptions = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSqlite(connection).AddInterceptors(interceptor).Options;
+        await using var db = new ApplicationDbContext(racingOptions);
+        var service = new GoogleProfileService(db);
+
+        var user = await service.UpsertAsync(
+            new GoogleProfile("google-race", "student@example.com", "Requested Name", null),
+            "America/Toronto", default);
+
+        Assert.True(interceptor.InsertedCompetingUser);
+        Assert.Equal("Requested Name", user.Name);
+        await using var verification = new ApplicationDbContext(plainOptions);
+        Assert.Equal("Requested Name", (await verification.Users.SingleAsync()).Name);
+    }
+
+    private sealed class CompetingGoogleUserInterceptor(
+        DbContextOptions<ApplicationDbContext> competitorOptions) : SaveChangesInterceptor
+    {
+        public bool InsertedCompetingUser { get; private set; }
+
+        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (InsertedCompetingUser
+                || eventData.Context is not ApplicationDbContext context
+                || !context.ChangeTracker.Entries<User>().Any(entry => entry.State == EntityState.Added))
+                return result;
+
+            InsertedCompetingUser = true;
+            await using var competitor = new ApplicationDbContext(competitorOptions);
+            competitor.Users.Add(new User
+            {
+                GoogleSubject = "google-race",
+                Email = "student@example.com",
+                Name = "Competing Name"
+            });
+            await competitor.SaveChangesAsync(cancellationToken);
+            return result;
+        }
     }
 }

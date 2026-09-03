@@ -37,7 +37,8 @@ public sealed class GoogleProfileService(ApplicationDbContext db) : IGoogleProfi
             throw new InvalidOperationException("This Google identity cannot be linked to the requested profile.");
         }
 
-        if (user is null)
+        var creating = user is null;
+        if (creating)
         {
             user = new User
             {
@@ -45,21 +46,44 @@ public sealed class GoogleProfileService(ApplicationDbContext db) : IGoogleProfi
                 Email = email,
                 Name = name,
                 PictureUrl = pictureUrl,
-                TimeZone = normalizedTimeZone,
-                PasswordHash = string.Empty
+                TimeZone = normalizedTimeZone
             };
             db.Users.Add(user);
         }
         else
         {
-            user.Email = email;
-            user.Name = name;
-            user.PictureUrl = pictureUrl;
-            user.TimeZone = normalizedTimeZone;
+            ApplyProfile(user!, email, name, pictureUrl, normalizedTimeZone);
         }
 
-        await db.SaveChangesAsync(cancellationToken);
-        return user;
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return user!;
+        }
+        catch (DbUpdateException) when (creating)
+        {
+            db.Entry(user!).State = EntityState.Detached;
+            var winner = await db.Users.SingleOrDefaultAsync(
+                candidate => candidate.GoogleSubject == subject,
+                cancellationToken);
+            if (winner is null)
+            {
+                throw;
+            }
+
+            var emailBelongsToAnotherUser = await db.Users.AnyAsync(
+                candidate => candidate.Email.ToLower() == email && candidate.Id != winner.Id,
+                cancellationToken);
+            if (emailBelongsToAnotherUser)
+            {
+                throw new InvalidOperationException(
+                    "This Google identity cannot be linked to the requested profile.");
+            }
+
+            ApplyProfile(winner, email, name, pictureUrl, normalizedTimeZone);
+            await db.SaveChangesAsync(cancellationToken);
+            return winner;
+        }
     }
 
     private static string Require(string value, string fieldName)
@@ -70,6 +94,19 @@ public sealed class GoogleProfileService(ApplicationDbContext db) : IGoogleProfi
         }
 
         return value.Trim();
+    }
+
+    private static void ApplyProfile(
+        User user,
+        string email,
+        string name,
+        string? pictureUrl,
+        string timeZone)
+    {
+        user.Email = email;
+        user.Name = name;
+        user.PictureUrl = pictureUrl;
+        user.TimeZone = timeZone;
     }
 
     private static string NormalizeTimeZone(string? requested)

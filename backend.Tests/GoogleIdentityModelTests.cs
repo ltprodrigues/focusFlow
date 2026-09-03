@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 public sealed class GoogleIdentityModelTests
 {
     [Fact]
-    public void User_HasUniqueFilteredGoogleSubjectIndex()
+    public void User_HasRequiredUniqueGoogleSubjectIndex()
     {
         using var db = TestDbContextFactory.Create();
         var entity = db.Model.FindEntityType(typeof(User))!;
@@ -14,7 +14,8 @@ public sealed class GoogleIdentityModelTests
                 .SequenceEqual(["GoogleSubject"]));
 
         Assert.True(index.IsUnique);
-        Assert.NotNull(index.GetFilter());
+        Assert.Null(index.GetFilter());
+        Assert.False(entity.FindProperty(nameof(User.GoogleSubject))!.IsNullable);
     }
 
     [Fact]
@@ -37,5 +38,11 @@ public sealed class GoogleIdentityModelTests
         var property = db.Model.FindEntityType(typeof(User))!
             .FindProperty(nameof(User.TimeZone))!;
         Assert.Equal("America/Toronto", property.GetDefaultValue());
+    }
+
+    [Fact]
+    public void User_NoLongerStoresAPasswordHash()
+    {
+        Assert.Null(typeof(User).GetProperty("PasswordHash"));
     }
 }

@@ -8,13 +8,11 @@ public class User
 
     public string Email { get; set; } = string.Empty;
 
-    public string? GoogleSubject { get; set; }
+    public string GoogleSubject { get; set; } = string.Empty;
 
     public string? PictureUrl { get; set; }
 
     public string TimeZone { get; set; } = "America/Toronto";
-
-    public string PasswordHash { get; set; } = string.Empty;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

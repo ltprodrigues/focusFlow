@@ -29,8 +29,7 @@ public class ApplicationDbContext : DbContext
                 .HasMaxLength(100)
                 .HasDefaultValue("America/Toronto");
             entity.HasIndex(user => user.GoogleSubject)
-                .IsUnique()
-                .HasFilter("\"GoogleSubject\" IS NOT NULL");
+                .IsUnique();
             entity.HasIndex(user => user.Email).IsUnique();
         });
 

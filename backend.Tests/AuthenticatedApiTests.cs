@@ -110,8 +110,7 @@ public sealed class AuthenticatedApiFactory : WebApplicationFactory<Program>
                 Id = id,
                 GoogleSubject = $"google-{id}",
                 Email = email,
-                Name = $"Student {id}",
-                PasswordHash = string.Empty
+                Name = $"Student {id}"
             });
             await db.SaveChangesAsync();
         }

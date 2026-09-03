@@ -97,9 +97,12 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    await using var scope = app.Services.CreateAsyncScope();
-    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    await db.Database.MigrateAsync();
+    if (app.Configuration.GetValue<bool>("Database:ApplyMigrationsOnStartup"))
+    {
+        await using var scope = app.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await db.Database.MigrateAsync();
+    }
 
     app.UseSwagger();
     app.UseSwaggerUI();
