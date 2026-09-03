@@ -1,10 +1,13 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, request } from './http'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError, request, setAntiforgeryToken } from './http'
 import { createTask, deleteTask, listTasks, updateTask } from './tasks'
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  setAntiforgeryToken(null)
 })
+
+beforeEach(() => setAntiforgeryToken('test-csrf-token'))
 
 function jsonResponse(body, status = 200) {
   return {
